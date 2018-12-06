@@ -9,7 +9,7 @@ yoo adb. Another adb client write with go.
 **For mac**
 
 ```bash
-brew install codeskyblue/ya
+brew install codeskyblue/tap/ya
 ```
 
 **For windows and linux**
@@ -18,7 +18,7 @@ download binary from [**releases**](https://github.com/codeskyblue/ya/releases)
 
 ## Usage
 ```
-adb install https://example.org/demo.apk
+ya install https://example.org/demo.apk
 ```
 
 ## LICENSE
