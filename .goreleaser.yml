@@ -1,0 +1,38 @@
+project_name: gohttpserver
+release:
+  github:
+    owner: codeskyblue
+    name: ya
+brew:
+  github:
+    owner: codeskyblue
+    name: homebrew-tap
+  homepage: https://github.com/codeskyblue/ya
+builds:
+- goos:
+  - linux
+  - darwin
+  - windows
+  goarch:
+  - amd64
+  - "386"
+  goarm:
+  - "6"
+  main: .
+archive:
+  format: zip
+  # name_template: '{{ .Binary }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
+  files:
+  - licence*
+  - LICENCE*
+  - license*
+  - LICENSE*
+  - readme*
+  - README*
+  #- changelog*
+  #- CHANGELOG*
+  #- .ghs.yml
+snapshot:
+  name_template: SNAPSHOT-{{ .Commit }}
+checksum:
+  name_template: '{{ .ProjectName }}_{{ .Version }}_checksums.txt'
