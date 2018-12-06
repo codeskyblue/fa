@@ -3,7 +3,7 @@ yoo adb. Another adb client write with go.
 
 ## Features
 - [ ] install support http url
-- [ ] show device selection when multi device connected
+- [x] show device selection when multi device connected
 
 ## Install
 **For mac**
