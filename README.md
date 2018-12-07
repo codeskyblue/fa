@@ -1,5 +1,7 @@
-# ya
-yoo adb. Another adb client write with go.
+# ya = your adb
+[![Build Status](https://travis-ci.org/codeskyblue/ya.svg?branch=master)](https://travis-ci.org/codeskyblue/ya)
+
+`ya` is a command line tool that wraps `adb` in order to extend it with extra features and commands that make working with Android easier.
 
 ## Features
 - [x] show device selection when multi device connected
