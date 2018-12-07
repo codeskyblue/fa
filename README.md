@@ -2,8 +2,10 @@
 yoo adb. Another adb client write with go.
 
 ## Features
-- [ ] install support http url
 - [x] show device selection when multi device connected
+- [ ] install support http url
+- [ ] support launch after install apk
+- [ ] show wlan (ip,mac,signal), enable and disable it
 
 ## Install
 **For mac**

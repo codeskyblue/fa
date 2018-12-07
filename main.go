@@ -10,9 +10,17 @@ import (
 	"github.com/manifoldco/promptui"
 )
 
+var (
+	version = "develop"
+)
+
 type Device struct {
 	Serial      string
 	Description string
+}
+
+func (d *Device) String() string {
+	return d.Serial
 }
 
 func listDevices() (ds []Device, err error) {
@@ -37,11 +45,11 @@ func choose(devices []Device) Device {
 	}
 	templates := &promptui.SelectTemplates{
 		Label:    "✨ {{ . | green}}", //"{{ . }}?",
-		Active:   "➤ {{ .Serial | cyan }} {{ .Description | faint }}",
-		Inactive: "  {{ .Serial | faint }} {{ .Description | faint }}",
+		Active:   "➤ {{ .Serial | cyan }}  {{ .Description | faint }}",
+		Inactive: "  {{ .Serial | faint }}  {{ .Description | faint }}",
 	}
 	prompt := promptui.Select{
-		Label:     "Select Device",
+		Label:     "Select device",
 		Items:     devices,
 		Templates: templates,
 	}
