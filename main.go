@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -81,19 +82,26 @@ func choose(devices []Device) Device {
 	return devices[i]
 }
 
-func adbWrap(args ...string) {
+func chooseOne() (serial string, err error) {
 	devices, err := listDevices()
+	if err != nil {
+		return
+	}
+	if len(devices) == 0 {
+		err = errors.New("no devices/emulators found")
+		return
+	}
+	d := choose(devices)
+	return d.Serial, nil
+}
+
+func adbWrap(args ...string) {
+	serial, err := chooseOne()
 	if err != nil {
 		log.Fatal(err)
 	}
-	if len(devices) == 0 {
-		log.Fatal("no devices detected")
-	}
-
-	d := choose(devices)
 	cmd := exec.Command(adbPath(), args...)
-	cmd.Env = append(os.Environ(), "ANDROID_SERIAL="+d.Serial)
-	// cmd.Args = os.Args
+	cmd.Env = append(os.Environ(), "ANDROID_SERIAL="+serial)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
@@ -157,8 +165,13 @@ func main() {
 				},
 			},
 			Action: func(ctx *cli.Context) error {
+				serial, err := chooseOne()
+				if err != nil {
+					return err
+				}
 				log.Println(ctx.String("output"))
 				c := exec.Command(adbPath(), "exec-out", "screencap", "-p")
+				c.Env = append(os.Environ(), "ANDROID_SERIAL="+serial)
 				imgfile, err := os.Create(ctx.String("output"))
 				if err != nil {
 					return err
