@@ -1,4 +1,4 @@
-module github.com/codeskyblue/ya
+module github.com/codeskyblue/fa
 
 require (
 	github.com/manifoldco/promptui v0.3.2
