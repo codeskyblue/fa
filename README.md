@@ -8,7 +8,15 @@
 - [x] screenshot
 - [x] install support http url
 - [x] support launch after install apk
+- [ ] install apk and auto click confirm
+- [ ] show current app
+- [ ] unlock device
+- [ ] reset device state, clean up installed packages
+- [ ] support `fa devices --json`
 - [ ] show wlan (ip,mac,signal), enable and disable it
+- [ ] share device to public web
+- [ ] check device health status
+- [ ] install ipa support
 
 ## Install
 **For mac**
@@ -76,7 +84,20 @@ $ fa adb pwd
 ```
 
 ## Reference
+Articles
+
 - <https://github.com/mzlogin/awesome-adb>
+- [Facebook One World Project](https://code.fb.com/android/managing-resources-for-large-scale-testing/)
+- [Facebook Device Lab](https://code.fb.com/android/the-mobile-device-lab-at-the-prineville-data-center/)
+- Article reverse ssh tunnling <https://www.howtoforge.com/reverse-ssh-tunneling>
+
+Libs might be useful
+
+- <https://github.com/fatedier/frp>
+- <https://golanglibs.com/search?q=tunnel>
+- <https://github.com/koding/tunnel>
+- <https://github.com/mmatczuk/go-http-tunnel>
+- <https://github.com/inconshreveable/go-tunnel>
 
 ## LICENSE
 [MIT](LICENSE)
