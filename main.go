@@ -11,7 +11,7 @@ import (
 	"syscall"
 
 	"github.com/manifoldco/promptui"
-	"gopkg.in/urfave/cli.v1"
+	cli "gopkg.in/urfave/cli.v1"
 )
 
 var (
@@ -163,24 +163,12 @@ func main() {
 					Value: "screenshot.png",
 					Usage: "output screenshot name",
 				},
+				cli.BoolFlag{
+					Name:  "open",
+					Usage: "open file after screenshot",
+				},
 			},
-			Action: func(ctx *cli.Context) error {
-				serial, err := chooseOne()
-				if err != nil {
-					return err
-				}
-				log.Println(ctx.String("output"))
-				c := exec.Command(adbPath(), "exec-out", "screencap", "-p")
-				c.Env = append(os.Environ(), "ANDROID_SERIAL="+serial)
-				imgfile, err := os.Create(ctx.String("output"))
-				if err != nil {
-					return err
-				}
-				defer imgfile.Close()
-				c.Stdout = imgfile
-				c.Stderr = os.Stderr
-				return c.Run()
-			},
+			Action: actScreenshot,
 		},
 	}
 	err := app.Run(os.Args)

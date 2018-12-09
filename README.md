@@ -1,7 +1,7 @@
-# ya = your adb
-[![Build Status](https://travis-ci.org/codeskyblue/ya.svg?branch=master)](https://travis-ci.org/codeskyblue/ya)
+# fa = fast adb
+[![Build Status](https://travis-ci.org/codeskyblue/fa.svg?branch=master)](https://travis-ci.org/codeskyblue/fa)
 
-`ya` is a command line tool that wraps `adb` in order to extend it with extra features and commands that make working with Android easier.
+`fa` is a command line tool that wraps `adb` in order to extend it with extra features and commands that make working with Android easier.
 
 ## Features
 - [x] show device selection when multi device connected
@@ -14,24 +14,24 @@
 **For mac**
 
 ```bash
-brew install codeskyblue/tap/ya
+brew install codeskyblue/tap/fa
 ```
 
 **For windows and linux**
 
-download binary from [**releases**](https://github.com/codeskyblue/ya/releases)
+download binary from [**releases**](https://github.com/codeskyblue/fa/releases)
 
 ## Usage
 Screenshot
 
 ```bash
-ya screenshot -o screenshot.png
+fa screenshot -o screenshot.png
 ```
 
 ~~Install APK~~
 
 ```
-ya install https://example.org/demo.apk
+fa install https://example.org/demo.apk
 ```
 
 ## Reference
