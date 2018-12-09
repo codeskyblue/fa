@@ -7,11 +7,12 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"runtime"
 	"strings"
 	"syscall"
 
 	"github.com/manifoldco/promptui"
-	cli "gopkg.in/urfave/cli.v1"
+	"github.com/urfave/cli"
 )
 
 var (
@@ -117,14 +118,21 @@ func adbWrap(args ...string) {
 }
 
 func adbPath() string {
-	return "adb"
+	exeName := "adb"
+	if runtime.GOOS == "windows" {
+		exeName += ".exe"
+	}
+	path, err := exec.LookPath(exeName)
+	if err != nil {
+		panic(err)
+	}
+	return path
 }
 
 func main() {
 	app := cli.NewApp()
-	app.Name = "ya"
 	app.Version = version
-	app.Usage = "ya: your adb helps you win at adb"
+	app.Usage = "fa (fast adb) helps you win at adb"
 	app.Authors = []cli.Author{
 		cli.Author{
 			Name:  "codeskyblue",
@@ -136,13 +144,20 @@ func main() {
 			Name:  "version",
 			Usage: "show version",
 			Action: func(ctx *cli.Context) error {
-				fmt.Printf("[ya]\n  version %s\n", version)
-				fmt.Println("[adb]")
-				c := exec.Command(adbPath(), "version")
-				c.Stdout = os.Stdout
-				c.Stderr = os.Stderr
-				c.Run()
+				fmt.Printf("fa  version %s\n", version)
+				adbVersion, err := DefaultAdbClient.Version()
+				if err != nil {
+					fmt.Printf("adb version err: %v\n", err)
+					return err
+				}
+				fmt.Println("adb version", adbVersion)
+				fmt.Println("adb path", adbPath())
 				return nil
+				// output, err := exec.Command(adbPath(), "version").Output()
+				// for _, line := range strings.Split(string(output), "\n") {
+				// 	fmt.Println("  " + line)
+				// }
+				// return err
 			},
 		},
 		{
@@ -169,6 +184,23 @@ func main() {
 				},
 			},
 			Action: actScreenshot,
+		},
+		{
+			Name:      "install",
+			Usage:     "install apk",
+			UsageText: "fa install [ul] <apk-file | url>",
+			// UseShortOptionHandling: true,
+			Flags: []cli.Flag{
+				cli.BoolFlag{
+					Name:  "force, f",
+					Usage: "uninstall if already installed",
+				},
+				cli.BoolFlag{
+					Name:  "launch, l",
+					Usage: "launch after success installed",
+				},
+			},
+			Action: actInstall,
 		},
 	}
 	err := app.Run(os.Args)

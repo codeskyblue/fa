@@ -3,46 +3,47 @@ package main
 import (
 	"log"
 	"os"
-	"os/exec"
 
-	cli "gopkg.in/urfave/cli.v1"
+	"github.com/pkg/browser"
+	"github.com/urfave/cli"
 )
 
-func adbCommand(serial string, args ...string) *exec.Cmd {
-	c := exec.Command(adbPath(), args...)
-	c.Env = append(os.Environ(), "ANDROID_SERIAL="+serial)
-	return c
-}
-
-func screenshotExecOut(serial, output string) error {
-	serial, err := chooseOne()
-	if err != nil {
-		return err
-	}
-	c := adbCommand(serial, "exec-out", "screencap", "-p")
-	imgfile, err := os.Create(output)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		imgfile.Close()
-		if err != nil {
-			os.Remove(output)
+func anyFuncs(funcs ...func() error) error {
+	var err error
+	for _, f := range funcs {
+		if err = f(); err == nil {
+			return nil
 		}
-	}()
-	c.Stdout = imgfile
-	// c.Stderr = os.Stderr
-	return c.Run()
+	}
+	return err
 }
 
-func screenshotScreencap(serial, output string) error {
-	tmpPath := "/sdcard/fa-screenshot.png"
-	c := adbCommand(serial, "shell", "screencap", "-p", tmpPath)
-	if err := c.Run(); err != nil {
-		return err
+func takeScreenshot(serial, output string) error {
+	execOut := func() error {
+		c := adbCommand(serial, "exec-out", "screencap", "-p")
+		imgfile, err := os.Create(output)
+		if err != nil {
+			return err
+		}
+		defer func() {
+			imgfile.Close()
+			if err != nil {
+				os.Remove(output)
+			}
+		}()
+		c.Stdout = imgfile
+		return c.Run()
 	}
-	defer adbCommand(serial, "shell", "rm", tmpPath).Run()
-	return adbCommand(serial, "pull", tmpPath, output).Run()
+	screencap := func() error {
+		tmpPath := "/sdcard/fa-screenshot.png"
+		c := adbCommand(serial, "shell", "screencap", "-p", tmpPath)
+		if err := c.Run(); err != nil {
+			return err
+		}
+		defer adbCommand(serial, "shell", "rm", tmpPath).Run()
+		return adbCommand(serial, "pull", tmpPath, output).Run()
+	}
+	return anyFuncs(execOut, screencap)
 }
 
 func actScreenshot(ctx *cli.Context) (err error) {
@@ -51,18 +52,12 @@ func actScreenshot(ctx *cli.Context) (err error) {
 		return err
 	}
 	output := ctx.String("output")
-	err = screenshotExecOut(serial, output)
-	if err != nil {
-		// log.Println("FAIL:", "exec-out", "screencap")
-		err = screenshotScreencap(serial, output)
-	}
+	err = takeScreenshot(serial, output)
 	if err == nil {
-		// log.Println("OKAY:", "shell", "screencap")
-		log.Println("save to", output)
+		log.Println("saved to", output)
 		if ctx.Bool("open") {
-			// TODO(ssx): only works on mac
-			exec.Command("open", output).Run()
+			browser.OpenFile(output)
 		}
 	}
-	return
+	return err
 }
