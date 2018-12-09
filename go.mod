@@ -2,6 +2,7 @@ module github.com/codeskyblue/fa
 
 require (
 	github.com/cavaliercoder/grab v2.0.0+incompatible
+	github.com/kr/pty v1.1.1
 	github.com/manifoldco/promptui v0.3.2
 	github.com/mattn/go-runewidth v0.0.3 // indirect
 	github.com/pkg/browser v0.0.0-20180916011732-0a3d74bf9ce4
