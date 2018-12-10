@@ -5,7 +5,8 @@ import (
 	"os"
 
 	"github.com/pkg/browser"
-	"github.com/urfave/cli"
+	// "github.com/urfave/cli"
+	cli "gopkg.in/urfave/cli.v1"
 )
 
 func anyFuncs(funcs ...func() error) error {

@@ -10,11 +10,10 @@ import (
 	"time"
 
 	"github.com/cavaliercoder/grab"
-	"github.com/kr/pty"
 	"github.com/pkg/errors"
 	"github.com/shogo82148/androidbinary/apk"
-	"github.com/urfave/cli"
 	pb "gopkg.in/cheggaaa/pb.v1"
+	cli "gopkg.in/urfave/cli.v1"
 )
 
 func httpDownload(dst string, url string) (resp *grab.Response, err error) {
@@ -92,13 +91,10 @@ func actInstall(ctx *cli.Context) error {
 	// install
 	outBuffer := bytes.NewBuffer(nil)
 	c := adbCommand(serial, "install", "-r", apkpath)
-	ttyf, err := pty.Start(c)
-	if err != nil {
-		return err
-	}
-	mwr := io.MultiWriter(os.Stdout, outBuffer)
-	io.Copy(mwr, ttyf)
-	if err := c.Wait(); err != nil {
+	c.Stdout = io.MultiWriter(os.Stdout, outBuffer)
+	c.Stderr = os.Stderr
+
+	if err := c.Run(); err != nil {
 		return err
 	}
 
