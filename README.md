@@ -9,13 +9,13 @@
 - [x] install support http url
 - [x] support launch after install apk
 - [ ] install apk and auto click confirm
+- [.] check device health status
 - [ ] show current app
 - [ ] unlock device
 - [ ] reset device state, clean up installed packages
 - [ ] support `fa devices --json`
 - [ ] show wlan (ip,mac,signal), enable and disable it
 - [ ] share device to public web
-- [ ] check device health status
 - [ ] install ipa support
 
 ## Install
@@ -30,36 +30,54 @@ brew install codeskyblue/tap/fa
 download binary from [**releases**](https://github.com/codeskyblue/fa/releases)
 
 ## Usage
-Show version
+### Show version
 
 ```bash
 $ fa version
 fa version v0.0.5 # just example
 ```
 
-Screenshot (only png support for now)
+### Run adb command with device select
+if multi device connected, `fa` will give you list of devices to choose.
+
+```bash
+$ fa adb shell
+@ select device
+  > 3aff8912  Smartion
+    vv12afvv  Google Nexus 5
+{selected 3aff8912}
+shell $
+```
+
+`-s` option and `$ANDROID_SERIAL` is also supported, but if you known serial, maybe use `adb` directly is better.
+
+```bash
+$ fa -s 3578298f adb shell pwd
+/
+$ ANDROID_SERIAL=3578298 fa adb shell pwd
+/
+```
+
+### Screenshot
+only `png` format
 
 ```bash
 fa screenshot -o screenshot.png
 ```
 
-Install APK
+### Install APK
 
-```
-$ fa install ApiDemos-debug.apk
-```
-
-Install APK then start app
-
-```
-$ fa install --launch ApiDemos-debug.apk
+```bash
+fa install ApiDemos-debug.apk # from local file
+fa install http://example.org/demo.apk # from URL
+fa install -l ApiDemos-debug.apk # launch after install
+fa install -f ApiDemos-debug.apk # uninstall before install
 ```
 
-Install APK from URL with _uninstall first and launch after installed_
+Show debug info when install
 
-
-```
-$ fa install --force --launch https://github.com/appium/java-client/raw/master/src/test/java/io/appium/java_client/ApiDemos-debug.apk
+```bash
+$ fa -d install --force --launch https://github.com/appium/java-client/raw/master/src/test/java/io/appium/java_client/ApiDemos-debug.apk
 Downloading ApiDemos-debug.apk...
  2.94 MiB / 2.94 MiB [================================] 100.00% 282.47 KiB/s 10s
 Download saved to ApiDemos-debug.apk
@@ -72,16 +90,7 @@ Launch io.appium.android.apis ...
 + adb -s 0123456789ABCDEF shell am start -n io.appium.android.apis/.ApiDemos
 ```
 
-Run adb command, if multi device connected, `fa` will give you choice to select one.
 
-```
-$ fa adb pwd
-@ select device
-  > 3aff8912  Smartion
-    vv12afvv  Google Nexus 5
-{selected 3aff8912}
-/
-```
 
 ## Reference
 Articles

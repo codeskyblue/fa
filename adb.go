@@ -7,8 +7,10 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 )
 
 const (
@@ -17,10 +19,40 @@ const (
 )
 
 func adbCommand(serial string, args ...string) *exec.Cmd {
-	fmt.Println("+ adb", "-s", serial, strings.Join(args, " "))
+	if debug {
+		fmt.Println("+ adb", "-s", serial, strings.Join(args, " "))
+	}
 	c := exec.Command(adbPath(), args...)
 	c.Env = append(os.Environ(), "ANDROID_SERIAL="+serial)
 	return c
+}
+
+func runCommand(name string, args ...string) (err error) {
+	if filepath.Base(name) == name {
+		name, err = exec.LookPath(name)
+		if err != nil {
+			return err
+		}
+	}
+	procAttr := new(os.ProcAttr)
+	procAttr.Files = []*os.File{os.Stdin, os.Stdout, os.Stderr}
+	proc, err := os.StartProcess(name, append([]string{name}, args...), procAttr)
+	if err != nil {
+		return err
+	}
+	procState, err := proc.Wait()
+	if err != nil {
+		return err
+	}
+	ws, ok := procState.Sys().(syscall.WaitStatus)
+	if !ok {
+		return errors.New("exit code unknown")
+	}
+	exitCode := ws.ExitStatus()
+	if exitCode == 0 {
+		return nil
+	}
+	return errors.New("exit code " + strconv.Itoa(exitCode))
 }
 
 func panicError(e error) {

@@ -16,7 +16,9 @@ import (
 )
 
 var (
-	version = "develop"
+	version       = "develop"
+	debug         = false
+	defaultSerial string
 )
 
 type Device struct {
@@ -62,6 +64,9 @@ func listDevices() (ds []Device, err error) {
 }
 
 func choose(devices []Device) Device {
+	if defaultSerial != "" {
+		return Device{Serial: defaultSerial}
+	}
 	if len(devices) == 1 {
 		return devices[0]
 	}
@@ -139,6 +144,19 @@ func main() {
 			Email: "codeskyblue@gmail.com",
 		},
 	}
+	app.Flags = []cli.Flag{
+		cli.BoolFlag{
+			Name:        "debug, d",
+			Usage:       "show debug info",
+			Destination: &debug,
+		},
+		cli.StringFlag{
+			Name:        "serial, s",
+			Usage:       "use device with given serial",
+			EnvVar:      "ANDROID_SERIAL",
+			Destination: &defaultSerial,
+		},
+	}
 	app.Commands = []cli.Command{
 		{
 			Name:  "version",
@@ -201,6 +219,19 @@ func main() {
 				},
 			},
 			Action: actInstall,
+		},
+		{
+			Name:  "healthcheck",
+			Usage: "check device health status",
+			Action: func(ctx *cli.Context) error {
+				log.Println("check install")
+				err := runCommand(os.Args[0], "install", "-f", "https://github.com/appium/java-client/raw/master/src/test/java/io/appium/java_client/ApiDemos-debug.apk")
+				if err != nil {
+					return err
+				}
+				log.Println("OKAY")
+				return nil
+			},
 		},
 	}
 	err := app.Run(os.Args)
