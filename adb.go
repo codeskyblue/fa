@@ -137,8 +137,17 @@ func (c *AdbClient) newConnection() (conn *AdbConnection, err error) {
 	return &AdbConnection{netConn}, nil
 }
 
-// Version returns adb server version
 func (c *AdbClient) Version() (string, error) {
+	ver, err := c.rawVersion()
+	if err == nil {
+		return ver, nil
+	}
+	exec.Command(adbPath(), "start-server").Run()
+	return c.rawVersion()
+}
+
+// Version returns adb server version
+func (c *AdbClient) rawVersion() (string, error) {
 	conn, err := c.newConnection()
 	if err != nil {
 		return "", err
