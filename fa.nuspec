@@ -20,6 +20,7 @@
   <files>
     <file src="dist\windows_386\**" target="tools/x86" />
     <file src="dist\windows_amd64\**" target="tools/x64" />
-    <file src="tools\LICENSE" target="tools/" />
+    <file src="tools\LICENSE.txt" target="tools/" />
+    <file src="tools\VERIFICATION.txt" target="tools/" />
   </files>
 </package>
