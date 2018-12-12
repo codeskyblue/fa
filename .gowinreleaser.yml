@@ -1,0 +1,11 @@
+builds:
+- goos:
+  - windows
+  goarch:
+  - amd64
+  - "386"
+  goarm:
+  - "6"
+  main: .
+archive:
+  format: zip

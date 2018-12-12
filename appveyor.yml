@@ -17,7 +17,7 @@ install:
 
 build_script:
   - go build
-  - goreleaser --rm-dist --snapshot
+  - goreleaser --rm-dist --snapshot --parallelism=1 --config=.gowinreleaser.yml
   - choco pack
 
 test_script:
