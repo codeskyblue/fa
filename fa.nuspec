@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>fa</id>
+    <version>1.1.0</version>
+    <title>fa</title>
+    <authors>codeskyblue</authors>
+    <projectUrl>https://github.com/codeskyblue/fa</projectUrl>
+    <iconUrl>https://raw.githubusercontent.com/codeskyblue/fa/master/_assets/fa_64x64.png</iconUrl>
+    <projectSourceUrl>https://github.com/codeskyblue/fa</projectSourceUrl>
+    <packageSourceUrl>https://github.com/codeskyblue/fa</packageSourceUrl>
+    <docsUrl>https://github.com/codeskyblue/fa</docsUrl>
+    <licenseUrl>https://github.com/codeskyblue/fa/blob/master/LICENSE</licenseUrl>
+    <bugTrackerUrl>https://github.com/codeskyblue/fa/issues</bugTrackerUrl>
+    <tags>fa xamarin ios android uwp semver versioning</tags>
+    <summary>Xamarin Automating Version Tool</summary>
+    <description>fa is a command line tool that wraps adb in order to extend it with extra features and commands that make working with Android easier.</description>
+    <releaseNotes>Visit https://github.com/codeskyblue/fa/releases/latest</releaseNotes>
+  </metadata>
+  <files>
+    <file src="dist\windows_386\**" target="tools/x86" />
+    <file src="dist\windows_amd64\**" target="tools/x64" />
+    <file src="tools\LICENSE" target="tools/" />
+  </files>
+</package>

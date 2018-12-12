@@ -1,0 +1,34 @@
+
+version: "{build}"
+
+image: Visual Studio 2017
+
+clone_folder: c:\projects\fa
+
+environment:
+  GOPATH: C:\gopath
+  GOVERSION: 1.11.x
+
+install:
+  - set PATH=%GOPATH%\bin;C:\go\bin;%PATH%
+  - go version
+  - go env
+  - go get github.com/goreleaser/goreleaser
+
+build_script:
+  - go build
+  - goreleaser --rm-dist --snapshot
+  - choco pack
+
+test_script:
+  - go test -v
+
+artifacts:
+  - path: '**\*.nupkg'
+
+deploy:
+  provider: Environment
+  name: Chocolatey
+  artifact: /.*\.nupkg/
+  on:
+    branch: master
