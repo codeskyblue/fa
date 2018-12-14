@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -11,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+
+	shellquote "github.com/kballard/go-shellquote"
 )
 
 const (
@@ -81,6 +84,15 @@ func (conn *AdbConnection) readN(n int) (v string, err error) {
 	return string(buf), nil
 }
 
+// Okay return true only when receive "OKAY"
+func (conn *AdbConnection) Okay() (b bool, err error) {
+	value, err := conn.readN(4)
+	if err != nil {
+		return false, err
+	}
+	return value == _OKAY, nil
+}
+
 func (conn *AdbConnection) readString() (string, error) {
 	hexlen, err := conn.readN(4)
 	if err != nil {
@@ -146,12 +158,52 @@ func (c *AdbClient) Version() (string, error) {
 	return c.rawVersion()
 }
 
+type TCPCmd struct {
+	Cmd          string
+	NeedResponse bool
+}
+
+func (c *AdbClient) Shell(args ...string) (output string, exitCode int, err error) {
+	conn, err := c.newConnection()
+	if err != nil {
+		return
+	}
+	defer conn.Close()
+	// if err = conn.SendPacket("host:features"); err != nil {
+	// 	return
+	// }
+	// _, err = conn.RecvPacket()
+	// if err != nil {
+	// 	return
+	// }
+	if err = conn.SendPacket("host:transport-any"); err != nil {
+		return
+	}
+	ok, _ := conn.Okay()
+	if !ok {
+		err = fmt.Errorf("shell connection broken")
+	}
+	err = conn.SendPacket("shell:" + shellquote.Join(args...) + " ; echo :$?")
+	if err != nil {
+		return
+	}
+	ok, _ = conn.Okay()
+	if !ok {
+		err = fmt.Errorf("shell connection broken")
+	}
+	buf := bytes.NewBuffer(nil)
+	io.Copy(buf, conn)
+	output = string(buf.Bytes())
+	return
+}
+
 // Version returns adb server version
 func (c *AdbClient) rawVersion() (string, error) {
 	conn, err := c.newConnection()
 	if err != nil {
 		return "", err
 	}
+	defer conn.Close()
 	if err := conn.SendPacket("host:version"); err != nil {
 		return "", err
 	}
