@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -19,11 +20,14 @@ var (
 	version       = "develop"
 	debug         = false
 	defaultSerial string
+	defaultHost   string
+	defaultPort   int
 )
 
 type Device struct {
-	Serial      string
-	Description string
+	Serial      string `json:"serial"`
+	Status      string `json:"status"`
+	Description string `json:"-"`
 }
 
 func (d *Device) String() string {
@@ -47,6 +51,23 @@ func shortDeviceInfo(s string) string {
 }
 
 func listDevices() (ds []Device, err error) {
+	output, err := exec.Command("adb", "devices").CombinedOutput()
+	if err != nil {
+		return
+	}
+	re := regexp.MustCompile(`(?m)^([^\s]+)\s+(device|offline|unauthorized)\s*$`)
+	matches := re.FindAllStringSubmatch(string(output), -1)
+	for _, m := range matches {
+		status := m[2]
+		ds = append(ds, Device{
+			Serial: m[1],
+			Status: status,
+		})
+	}
+	return
+}
+
+func listDetailedDevices() (ds []Device, err error) {
 	output, err := exec.Command("adb", "devices", "-l").CombinedOutput()
 	if err != nil {
 		return
@@ -89,7 +110,7 @@ func choose(devices []Device) Device {
 }
 
 func chooseOne() (serial string, err error) {
-	devices, err := listDevices()
+	devices, err := listDetailedDevices()
 	if err != nil {
 		return
 	}
@@ -156,26 +177,63 @@ func main() {
 			EnvVar:      "ANDROID_SERIAL",
 			Destination: &defaultSerial,
 		},
+		cli.StringFlag{
+			Name:        "host, H",
+			Usage:       "name of adb server host",
+			Value:       "localhost",
+			Destination: &defaultHost,
+		},
+		cli.IntFlag{
+			Name:        "port, P",
+			Usage:       "port of adb server",
+			Value:       5037,
+			Destination: &defaultPort,
+		},
 	}
 	app.Commands = []cli.Command{
 		{
 			Name:  "version",
 			Usage: "show version",
 			Action: func(ctx *cli.Context) error {
-				fmt.Printf("fa  version %s\n", version)
-				adbVersion, err := DefaultAdbClient.Version()
+				fmt.Printf("fa version %s\n", version)
+				adbVersion, err := NewAdbClient().Version()
 				if err != nil {
 					fmt.Printf("adb version err: %v\n", err)
 					return err
 				}
-				fmt.Println("adb version", adbVersion)
 				fmt.Println("adb path", adbPath())
+				fmt.Println("adb server version", adbVersion)
 				return nil
 				// output, err := exec.Command(adbPath(), "version").Output()
 				// for _, line := range strings.Split(string(output), "\n") {
 				// 	fmt.Println("  " + line)
 				// }
 				// return err
+			},
+		},
+		{
+			Name:  "devices",
+			Usage: "show connected devices",
+			Flags: []cli.Flag{
+				cli.BoolFlag{
+					Name:  "json",
+					Usage: "output json format",
+				},
+			},
+			Action: func(ctx *cli.Context) error {
+				ds, err := listDevices()
+				if err != nil {
+					return err
+				}
+				if ctx.Bool("json") {
+					data, _ := json.MarshalIndent(ds, "", "  ")
+					fmt.Println(string(data))
+				} else {
+					for _, d := range ds {
+						fmt.Printf("%s\t%s\n", d.Serial, d.Status)
+					}
+				}
+				return nil
 			},
 		},
 		{

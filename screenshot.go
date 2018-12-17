@@ -1,8 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
+	"runtime"
+	"time"
 
 	"github.com/pkg/browser"
 	// "github.com/urfave/cli"
@@ -36,13 +39,16 @@ func takeScreenshot(serial, output string) error {
 		return c.Run()
 	}
 	screencap := func() error {
-		tmpPath := "/sdcard/fa-screenshot.png"
+		tmpPath := fmt.Sprintf("/sdcard/fa-screenshot-%d.png", time.Now().UnixNano())
 		c := adbCommand(serial, "shell", "screencap", "-p", tmpPath)
 		if err := c.Run(); err != nil {
 			return err
 		}
 		defer adbCommand(serial, "shell", "rm", tmpPath).Run()
 		return adbCommand(serial, "pull", tmpPath, output).Run()
+	}
+	if runtime.GOOS == "windows" {
+		return screencap()
 	}
 	return anyFuncs(execOut, screencap)
 }
