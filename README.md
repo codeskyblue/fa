@@ -8,12 +8,12 @@
 - [x] screenshot
 - [x] install support http url
 - [x] support launch after install apk
+- [x] support `fa devices --json`
 - [ ] install apk and auto click confirm
 - [.] check device health status
 - [ ] show current app
 - [ ] unlock device
 - [ ] reset device state, clean up installed packages
-- [ ] support `fa devices --json`
 - [ ] show wlan (ip,mac,signal), enable and disable it
 - [ ] share device to public web
 - [ ] install ipa support
@@ -35,6 +35,15 @@ download binary from [**releases**](https://github.com/codeskyblue/fa/releases)
 ```bash
 $ fa version
 fa version v0.0.5 # just example
+adb server version 0028
+```
+
+### Show devices
+- [x] Remove header `List of devices attached` to make it easy parse
+
+```bash
+$ fa devices
+3578298f        device
 ```
 
 ### Run adb command with device select
@@ -59,7 +68,7 @@ $ ANDROID_SERIAL=3578298 fa adb shell pwd
 ```
 
 ### Screenshot
-only `png` format
+only `png` format now.
 
 ```bash
 fa screenshot -o screenshot.png
@@ -91,7 +100,6 @@ Launch io.appium.android.apis ...
 ```
 
 
-
 ## Reference
 Articles
 
@@ -99,6 +107,12 @@ Articles
 - [Facebook One World Project](https://code.fb.com/android/managing-resources-for-large-scale-testing/)
 - [Facebook Device Lab](https://code.fb.com/android/the-mobile-device-lab-at-the-prineville-data-center/)
 - Article reverse ssh tunnling <https://www.howtoforge.com/reverse-ssh-tunneling>
+- [openstf/adbkit](https://github.com/openstf/adbkit)
+- [ADB Source Code](https://github.com/aosp-mirror/platform_system_core/blob/master/adb)
+
+    - [OVERVIEW.TXT](https://github.com/aosp-mirror/platform_system_core/blob/master/adb/OVERVIEW.TXT)
+    - [SERVICES.TXT](https://github.com/aosp-mirror/platform_system_core/blob/master/adb/SERVICES.TXT)
+    - [SYNC.TXT](https://github.com/aosp-mirror/platform_system_core/blob/master/adb/SYNC.TXT)
 
 Libs might be useful
 

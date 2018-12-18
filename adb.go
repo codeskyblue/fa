@@ -138,7 +138,7 @@ type AdbClient struct {
 
 func NewAdbClient() *AdbClient {
 	return &AdbClient{
-		Addr: "127.0.0.1:5037",
+		Addr: defaultHost + ":" + strconv.Itoa(defaultPort),
 	}
 }
 
