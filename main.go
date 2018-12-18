@@ -57,6 +57,7 @@ func listDevices() (ds []Device, err error) {
 	}
 	re := regexp.MustCompile(`(?m)^([^\s]+)\s+(device|offline|unauthorized)\s*$`)
 	matches := re.FindAllStringSubmatch(string(output), -1)
+	ds = make([]Device, 0, len(matches))
 	for _, m := range matches {
 		status := m[2]
 		ds = append(ds, Device{
