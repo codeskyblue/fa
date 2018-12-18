@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+
+	shellquote "github.com/kballard/go-shellquote"
 )
 
 const (
@@ -65,11 +67,13 @@ type AdbConnection struct {
 	net.Conn
 }
 
-// SendPacket data is like "000chost:version"
-func (conn *AdbConnection) SendPacket(data string) error {
+func (conn *AdbConnection) WritePacket(data string) error {
 	pktData := fmt.Sprintf("%04x%s", len(data), data)
 	_, err := conn.Write([]byte(pktData))
-	return err
+	if err != nil {
+		return err
+	}
+	return conn.respCheck()
 }
 
 func (conn *AdbConnection) readN(n int) (v string, err error) {
@@ -84,6 +88,9 @@ func (conn *AdbConnection) readN(n int) (v string, err error) {
 // respCheck check OKAY, or FAIL
 func (conn *AdbConnection) respCheck() error {
 	status, err := conn.readN(4)
+	if err != nil {
+		return err
+	}
 	switch status {
 	case _OKAY:
 		return nil
@@ -94,7 +101,7 @@ func (conn *AdbConnection) respCheck() error {
 		}
 		return errors.New(data)
 	default:
-		return fmt.Errorf("Unknown status: %s, should be OKAY or FAIL", strconv.Quote(stat))
+		return fmt.Errorf("Unexpected response: %s, should be OKAY or FAIL", strconv.Quote(status))
 	}
 }
 
@@ -109,27 +116,6 @@ func (conn *AdbConnection) readString() (string, error) {
 		return "", err
 	}
 	return conn.readN(length)
-}
-
-// RecvPacket receive data like "OKAY00040028"
-func (conn *AdbConnection) RecvPacket() (data string, err error) {
-	stat, err := conn.readN(4)
-	if err != nil {
-		return "", err
-	}
-	switch stat {
-	case _OKAY:
-		return conn.readString()
-	case _FAIL:
-		data, err = conn.readString()
-		if err != nil {
-			return
-		}
-		err = errors.New(data)
-		return
-	default:
-		return "", fmt.Errorf("Unknown stat: %s", strconv.Quote(stat))
-	}
 }
 
 type AdbClient struct {
@@ -154,51 +140,7 @@ func (c *AdbClient) newConnection() (conn *AdbConnection, err error) {
 	return &AdbConnection{netConn}, nil
 }
 
-func (c *AdbClient) sendTwoWay(data string) (string, error) {
-	if _, err := c.Version(); err != nil {
-		return "", err
-	}
-	conn, err := c.newConnection()
-	if err != nil {
-		return "", err
-	}
-	defer conn.Close()
-	if err := conn.SendPacket(data); err != nil {
-		return "", err
-	}
-	return conn.RecvPacket()
-}
-
-func (c *AdbClient) sendOneWay(data string) error {
-	if _, err := c.Version(); err != nil {
-		return err
-	}
-	conn, err := c.newConnection()
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-	if err := conn.SendPacket(data); err != nil {
-		return err
-	}
-	status, err := conn.readN(4)
-	if err != nil {
-		return err
-	}
-	switch status {
-	case _OKAY:
-		return nil
-	case _FAIL:
-		message, err := conn.readString()
-		if err != nil {
-			return err
-		}
-		return errors.New(message)
-	default:
-		return errors.New("Invalid status: " + status)
-	}
-}
-
+// Version return 4 size string
 func (c *AdbClient) Version() (string, error) {
 	ver, err := c.rawVersion()
 	if err == nil {
@@ -215,10 +157,10 @@ func (c *AdbClient) rawVersion() (string, error) {
 		return "", err
 	}
 	defer conn.Close()
-	if err := conn.SendPacket("host:version"); err != nil {
+	if err := conn.WritePacket("host:version"); err != nil {
 		return "", err
 	}
-	return conn.RecvPacket()
+	return conn.readString()
 }
 
 type AdbDevice struct {
@@ -233,60 +175,29 @@ func (c *AdbClient) DeviceWithSerial(serial string) *AdbDevice {
 	}
 }
 
-func (d *AdbDevice) deviceSelector() string {
-	if d.Serial == "" {
-		return "host:transport-any"
-	}
-	return "host-serial:" + d.Serial
-}
-
-func (d *AdbDevice) transportSelector() string {
-	if d.Serial == "" {
-		return "host:transport-any"
-	}
-	return "host:transport:" + d.Serial
-}
-
-func (d *AdbDevice) check() error {
-	_, err := d.sendTwoWay(d.deviceSelector() + ":features")
-	return err
-}
-
-type TCPCmd struct {
-	Cmd          string
-	NeedResponse bool
-}
-
-func (c *AdbClient) Shell(args ...string) (output string, exitCode int, err error) {
+func (c *AdbDevice) openCommand(cmd string) (reader io.ReadCloser, err error) {
 	conn, err := c.newConnection()
 	if err != nil {
 		return
 	}
-	defer conn.Close()
-	// if err = conn.SendPacket("host:features"); err != nil {
-	// 	return
-	// }
-	// _, err = conn.RecvPacket()
-	// if err != nil {
-	// 	return
-	// }
-	if err = conn.SendPacket("host:transport-any"); err != nil {
-		return
-	}
-	ok, _ := conn.Okay()
-	if !ok {
-		err = fmt.Errorf("shell connection broken")
-	}
-	err = conn.SendPacket("shell:" + shellquote.Join(args...) + " ; echo :$?")
+	err = conn.WritePacket("host:transport:" + c.Serial)
 	if err != nil {
 		return
 	}
-	ok, _ = conn.Okay()
-	if !ok {
-		err = fmt.Errorf("shell connection broken")
+	err = conn.WritePacket("shell:" + cmd) //shellquote.Join(args...)) // + " ; echo :$?")
+	if err != nil {
+		return
 	}
-	buf := bytes.NewBuffer(nil)
-	io.Copy(buf, conn)
-	output = string(buf.Bytes())
-	return
+	return conn, nil
 }
+
+func (c *AdbDevice) OpenShell(args ...string) (reader io.ReadCloser, err error) {
+	return c.openCommand(shellquote.Join(args...))
+}
+
+// func (c *AdbDevice) RunShell(args ...string) (exitCode int, err error) {
+// 	reader, err := c.OpenShell(args...)
+// 	if err != nil {
+// 		return
+// 	}
+// }

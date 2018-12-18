@@ -109,10 +109,7 @@ Articles
 - Article reverse ssh tunnling <https://www.howtoforge.com/reverse-ssh-tunneling>
 - [openstf/adbkit](https://github.com/openstf/adbkit)
 - [ADB Source Code](https://github.com/aosp-mirror/platform_system_core/blob/master/adb)
-
-    - [OVERVIEW.TXT](https://github.com/aosp-mirror/platform_system_core/blob/master/adb/OVERVIEW.TXT)
-    - [SERVICES.TXT](https://github.com/aosp-mirror/platform_system_core/blob/master/adb/SERVICES.TXT)
-    - [SYNC.TXT](https://github.com/aosp-mirror/platform_system_core/blob/master/adb/SYNC.TXT)
+- ADB Protocols [OVERVIEW.TXT](https://github.com/aosp-mirror/platform_system_core/blob/master/adb/OVERVIEW.TXT) [SERVICES.TXT](https://github.com/aosp-mirror/platform_system_core/blob/master/adb/SERVICES.TXT) [SYNC.TXT](https://github.com/aosp-mirror/platform_system_core/blob/master/adb/SYNC.TXT)
 
 Libs might be useful
 

@@ -14,5 +14,8 @@
 go.sum
 
 # User defined
-ya
+fa
 *.apk
+.DS_Store
+dist/
+*.png

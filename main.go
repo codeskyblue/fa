@@ -279,20 +279,20 @@ func main() {
 			},
 			Action: actInstall,
 		},
-		{
-			Name:            "shell",
-			Usage:           "run shell command",
-			SkipFlagParsing: true,
-			Action: func(ctx *cli.Context) error {
-				output, exitCode, err := DefaultAdbClient.Shell(ctx.Args()...)
-				if err != nil {
-					return err
-				}
-				fmt.Print(output)
-				os.Exit(exitCode)
-				return nil
-			},
-		},
+		// {
+		// 	Name:            "shell",
+		// 	Usage:           "run shell command",
+		// 	SkipFlagParsing: true,
+		// 	Action: func(ctx *cli.Context) error {
+		// 		output, exitCode, err := DefaultAdbClient.Shell(ctx.Args()...)
+		// 		if err != nil {
+		// 			return err
+		// 		}
+		// 		fmt.Print(output)
+		// 		os.Exit(exitCode)
+		// 		return nil
+		// 	},
+		// },
 		{
 			Name:  "healthcheck",
 			Usage: "check device health status",
