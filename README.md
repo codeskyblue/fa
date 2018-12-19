@@ -108,7 +108,9 @@ So if you have binary `busybox` in `/data/local/tmp`,
 You can just run
 
 ```
-fa shell busybox ls
+$ fa shell busybox ls
+# using adb shell you have to
+$ adb shell /data/local/tmp/busybox ls
 ```
 
 ## Reference
