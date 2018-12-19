@@ -2,6 +2,7 @@ module github.com/codeskyblue/fa
 
 require (
 	github.com/cavaliercoder/grab v2.0.0+incompatible
+	github.com/fatih/color v1.7.0 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 	github.com/kr/pty v1.1.3 // indirect
 	github.com/manifoldco/promptui v0.3.2

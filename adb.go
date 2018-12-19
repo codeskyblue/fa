@@ -175,7 +175,7 @@ func (c *AdbClient) DeviceWithSerial(serial string) *AdbDevice {
 	}
 }
 
-func (c *AdbDevice) openCommand(cmd string) (reader io.ReadCloser, err error) {
+func (c *AdbDevice) OpenShell(cmd string) (rw io.ReadWriteCloser, err error) {
 	conn, err := c.newConnection()
 	if err != nil {
 		return
@@ -191,13 +191,18 @@ func (c *AdbDevice) openCommand(cmd string) (reader io.ReadCloser, err error) {
 	return conn, nil
 }
 
-func (c *AdbDevice) OpenShell(args ...string) (reader io.ReadCloser, err error) {
-	return c.openCommand(shellquote.Join(args...))
+// OpenCommand accept list of args return combined output reader
+func (c *AdbDevice) OpenCommand(args ...string) (reader io.ReadWriteCloser, err error) {
+	return c.OpenShell(shellquote.Join(args...))
 }
 
-// func (c *AdbDevice) RunShell(args ...string) (exitCode int, err error) {
-// 	reader, err := c.OpenShell(args...)
-// 	if err != nil {
-// 		return
-// 	}
-// }
+func (c *AdbDevice) RunCommand(args ...string) (exitCode int, err error) {
+	// TODO
+	reader, err := c.OpenCommand(args...)
+	if err != nil {
+		return
+	}
+	defer reader.Close()
+	_, err = io.Copy(os.Stdout, reader)
+	return
+}
