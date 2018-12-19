@@ -13,6 +13,9 @@ import (
 	"strings"
 	"syscall"
 
+	shellquote "github.com/kballard/go-shellquote"
+	tty "github.com/mattn/go-tty"
+
 	"github.com/manifoldco/promptui"
 	cli "gopkg.in/urfave/cli.v1"
 )
@@ -267,7 +270,7 @@ func main() {
 			Name:      "install",
 			Usage:     "install apk",
 			UsageText: "fa install [ul] <apk-file | url>",
-			// UseShortOptionHandling: true,
+			// UseShortOptionHandling: true, // not supported in current urfav/cli
 			Flags: []cli.Flag{
 				cli.BoolFlag{
 					Name:  "force, f",
@@ -290,16 +293,24 @@ func main() {
 					return err
 				}
 				device := DefaultAdbClient.DeviceWithSerial(serial)
-				rwc, err := device.OpenCommand(ctx.Args()...)
+
+				var cmd string
+				if len(ctx.Args()) != 0 {
+					cmd = `PATH="$PATH:/data/local/tmp" ` + shellquote.Join(ctx.Args()...)
+				}
+				rwc, err := device.OpenShell(cmd)
 				if err != nil {
 					return err
 				}
 				defer rwc.Close()
-				go io.Copy(rwc, os.Stdin)
-				io.Copy(os.Stdout, rwc)
-				// fmt.Print(output)
-				// os.Exit(exitCode)
-				return nil
+				tty, err := tty.Open()
+				if err != nil {
+					log.Fatal(err)
+				}
+				defer tty.Close()
+				go io.Copy(rwc, tty.Input())
+				_, err = io.Copy(tty.Output(), rwc)
+				return err
 			},
 		},
 		{

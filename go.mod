@@ -7,6 +7,7 @@ require (
 	github.com/kr/pty v1.1.3 // indirect
 	github.com/manifoldco/promptui v0.3.2
 	github.com/mattn/go-runewidth v0.0.3 // indirect
+	github.com/mattn/go-tty v0.0.0-20181127064339-e4f871175a2f
 	github.com/pkg/browser v0.0.0-20180916011732-0a3d74bf9ce4
 	github.com/pkg/errors v0.8.0
 	github.com/shogo82148/androidbinary v0.0.0-20180627093851-01c4bfa8b3b5

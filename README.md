@@ -9,6 +9,7 @@
 - [x] install support http url
 - [x] support launch after install apk
 - [x] support `fa devices --json`
+- [x] support `fa shell`
 - [ ] install apk and auto click confirm
 - [.] check device health status
 - [ ] show current app
@@ -99,6 +100,16 @@ Launch io.appium.android.apis ...
 + adb -s 0123456789ABCDEF shell am start -n io.appium.android.apis/.ApiDemos
 ```
 
+### Shell
+Like `adb shell`, run `fa shell` will open a terminal
+
+The difference is `fa shell` will add `/data/local/tmp` into `$PATH`
+So if you have binary `busybox` in `/data/local/tmp`,
+You can just run
+
+```
+fa shell busybox ls
+```
 
 ## Reference
 Articles
