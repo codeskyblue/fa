@@ -10,6 +10,7 @@
 - [x] support launch after install apk
 - [x] support `fa devices --json`
 - [x] support `fa shell`
+- [x] colorful logcat and filter with package name
 - [ ] install apk and auto click confirm
 - [.] check device health status
 - [ ] show current app
@@ -113,6 +114,27 @@ $ fa shell busybox ls
 $ adb shell /data/local/tmp/busybox ls
 ```
 
+### Pidcat (logcat)
+Current implementation is wrapper of [pidcat.py](https://github.com/JakeWharton/pidcat)
+So use this feature, you need python installed.
+
+```bash
+$ fa help pidcat
+USAGE:
+   fa pidcat [package-name ...]
+
+OPTIONS:
+   --current                     filter logcat by current running app
+   --clear                       clear the entire log before running
+   --min-level value, -l value   Minimum level to be displayed {V,D,I,W,E,F}
+   --tag value, -t value         filter output by specified tag(s)
+   --ignore-tag value, -i value  filter output by ignoring specified tag(s)
+```
+
+The pidcat is very beautiful.
+
+![pidcat](https://github.com/JakeWharton/pidcat/raw/master/screen.png)
+
 ## Reference
 Articles
 
@@ -123,6 +145,7 @@ Articles
 - [openstf/adbkit](https://github.com/openstf/adbkit)
 - [ADB Source Code](https://github.com/aosp-mirror/platform_system_core/blob/master/adb)
 - ADB Protocols [OVERVIEW.TXT](https://github.com/aosp-mirror/platform_system_core/blob/master/adb/OVERVIEW.TXT) [SERVICES.TXT](https://github.com/aosp-mirror/platform_system_core/blob/master/adb/SERVICES.TXT) [SYNC.TXT](https://github.com/aosp-mirror/platform_system_core/blob/master/adb/SYNC.TXT)
+- [JakeWharton/pidcat](https://github.com/JakeWharton/pidcat)
 
 Libs might be useful
 

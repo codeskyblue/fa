@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"runtime"
 	"strings"
@@ -311,6 +313,66 @@ func main() {
 				go io.Copy(rwc, tty.Input())
 				_, err = io.Copy(tty.Output(), rwc)
 				return err
+			},
+		},
+		{
+			Name:      "pidcat",
+			Usage:     "logcat filter with package name",
+			UsageText: "fa pidcat [package-name ...]",
+			Flags: []cli.Flag{
+				cli.BoolFlag{
+					Name:  "current",
+					Usage: "filter logcat by current running app",
+				},
+				cli.BoolFlag{
+					Name:  "clear",
+					Usage: "clear the entire log before running",
+				},
+				cli.StringFlag{
+					Name:  "min-level, l",
+					Usage: "Minimum level to be displayed {V,D,I,W,E,F}",
+				},
+				cli.StringSliceFlag{
+					Name:  "tag, t",
+					Usage: "filter output by specified tag(s)",
+				},
+				cli.StringSliceFlag{
+					Name:  "ignore-tag, i",
+					Usage: "filter output by ignoring specified tag(s)",
+				},
+			},
+			Action: func(ctx *cli.Context) error {
+				serial, err := chooseOne()
+				if err != nil {
+					return err
+				}
+				faDir := filepath.Join(os.Getenv("HOME"), ".fa")
+				if err := os.MkdirAll(faDir, 0755); err != nil {
+					return err
+				}
+				pidcatPath := filepath.Join(faDir, "pidcat.py")
+				err = ioutil.WriteFile(pidcatPath, []byte(pidcatCode), 0644)
+				if err != nil {
+					return err
+				}
+				args := []string{pidcatPath, "-s", serial}
+				if ctx.Bool("current") {
+					args = append(args, "--current")
+				}
+				if ctx.Bool("clear") {
+					args = append(args, "--clear")
+				}
+				if ctx.String("min-level") != "" {
+					args = append(args, "-l", ctx.String("min-level"))
+				}
+				for _, tag := range ctx.StringSlice("tag") {
+					args = append(args, "-t", tag)
+				}
+				for _, ignore := range ctx.StringSlice("ignore-tag") {
+					args = append(args, "-i", ignore)
+				}
+				args = append(args, ctx.Args()...)
+				return runCommand("python", args...)
 			},
 		},
 		{
