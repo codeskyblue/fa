@@ -24,7 +24,7 @@ func anyFuncs(funcs ...func() error) error {
 
 func takeScreenshot(serial, output string) error {
 	execOut := func() error {
-		c := adbCommand(serial, "exec-out", "screencap", "-p")
+		c := adbCommand(serial, "exec-out", "screencap", "-p", "2>/dev/null")
 		imgfile, err := os.Create(output)
 		if err != nil {
 			return err
