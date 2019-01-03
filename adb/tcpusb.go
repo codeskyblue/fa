@@ -17,6 +17,8 @@ const (
 	CLSE = "CLSE"
 	WRTE = "WRTE"
 	AUTH = "AUTH"
+
+	TOKEN_LENGTH = 20
 )
 
 func checksum(data []byte) byte {
@@ -74,27 +76,50 @@ func (p *PacketReader) r() io.Reader {
 // 00000020  61 74 75 72 65 73 3d 63  6d 64 2c 73 74 61 74 5f  |atures=cmd,stat_|
 // 00000030  76 32 2c 73 68 65 6c 6c  5f 76 32                 |v2,shell_v2|
 func (p *PacketReader) readPacket() {
+	pkt := Packet{
+		Command: p.readStringN(4),
+		Arg0:    p.readN(4),
+		Arg1:    p.readN(4),
+	}
+
 	var (
-		command = p.readStringN(4)
-		arg0    = p.readN(4)
-		arg1    = p.readN(4)
-		length  = p.readInt32()
-		check   = p.readInt32()
-		magic   = p.readN(4)
+		length = p.readInt32()
+		check  = p.readInt32()
+		magic  = p.readN(4)
 	)
+
+	pkt.Body = p.readN(int(length))
+
 	if p.err != nil {
 		return
-		// log.Println("ERR:", p.err)
 	}
-	if !bytes.Equal(xorBytes([]byte(command), magic), []byte{0xff, 0xff, 0xff, 0xff}) {
+	if !bytes.Equal(xorBytes([]byte(pkt.Command), magic), []byte{0xff, 0xff, 0xff, 0xff}) {
 		p.err = errors.New("verify magic failed")
 		return
 	}
 	log.Printf("cmd:%s, arg0:%x, arg1:%x, len:%d, check:%d, magic:%x",
-		command, arg0, arg1, length, check, magic)
-	log.Printf("cmd:%x", []byte(command))
-	body := p.readStringN(int(length))
-	log.Println(body)
+		pkt.Command, pkt.Arg0, pkt.Arg1, length, check, magic)
+
+	log.Println("Body:", string(pkt.Body))
+
+	switch pkt.Command {
+	case "CNXN":
+		var version uint32
+		binary.Read(bytes.NewBuffer(pkt.Arg0), binary.BigEndian, &version)
+		log.Println("Version", version)
+		var maxPayload uint32
+		binary.Read(bytes.NewBuffer(pkt.Arg1), binary.LittleEndian, &maxPayload)
+		log.Println("MaxPayload:", maxPayload)
+		if maxPayload > 0xFFFF { // UINT16_MAX
+			maxPayload = 0xFFFF
+		}
+		log.Println("MaxPayload:", maxPayload)
+
+		// Ref link
+		// https://github.com/openstf/adbkit/blob/master/src/adb/tcpusb/socket.coffee
+		make([]byte, TOKEN_LENGTH)
+	}
+
 }
 
 func (p *PacketReader) readN(n int) []byte {
