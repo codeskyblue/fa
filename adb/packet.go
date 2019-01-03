@@ -3,8 +3,20 @@ package adb
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
+	"fmt"
+	"io"
+	"os"
 	"strconv"
 )
+
+func swapUint32(n uint32) uint32 {
+	var i uint32
+	buf := bytes.NewBuffer(nil)
+	binary.Write(buf, binary.LittleEndian, n)
+	binary.Read(buf, binary.BigEndian, &i)
+	return i
+}
 
 // Packet is a meta for adb connect
 type Packet struct {
@@ -43,4 +55,15 @@ func (pkt Packet) EncodeToBytes() []byte {
 	binary.Write(buf, binary.LittleEndian, pkt.magic())
 	buf.Write(pkt.Body)
 	return buf.Bytes()
+}
+
+func (pkt Packet) WriteTo(wr io.Writer) (n int, err error) {
+	return wr.Write(pkt.EncodeToBytes())
+}
+
+func (pkt Packet) DumpToStdout() {
+	fmt.Printf("cmd:%s arg0:%d arg1:%d\n", pkt.Command, pkt.Arg0, pkt.Arg1)
+	dumper := hex.Dumper(os.Stdout)
+	dumper.Write(pkt.Body)
+	dumper.Close()
 }

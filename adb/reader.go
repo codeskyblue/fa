@@ -10,13 +10,13 @@ import (
 )
 
 const (
-	SYNC = "SYNC"
-	CNXN = "CNXN"
-	OPEN = "OPEN"
-	OKAY = "OKAY"
-	CLSE = "CLSE"
-	WRTE = "WRTE"
-	AUTH = "AUTH"
+	_SYNC = "SYNC"
+	_CNXN = "CNXN"
+	_OPEN = "OPEN"
+	_OKAY = "OKAY"
+	_CLSE = "CLSE"
+	_WRTE = "WRTE"
+	_AUTH = "AUTH"
 
 	UINT16_MAX = 0xFFFF
 	UINT32_MAX = 0xFFFFFFFF
