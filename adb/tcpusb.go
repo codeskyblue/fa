@@ -1,139 +1,71 @@
 package adb
 
 import (
-	"bytes"
-	"encoding/binary"
-	"errors"
-	"fmt"
-	"io"
+	"crypto/rand"
+	"encoding/base64"
+	"encoding/hex"
 	"log"
+	"net"
+	"os"
 )
 
-const (
-	SYNC = "SYNC"
-	CXNN = "CXNN"
-	OPEN = "OPEN"
-	OKAY = "OKAY"
-	CLSE = "CLSE"
-	WRTE = "WRTE"
-	AUTH = "AUTH"
+func handleConnect(conn net.Conn) {
+	defer conn.Close()
+	log.Printf("remote: %s", conn.RemoteAddr())
+	prd := NewPacketReader(conn)
 
-	TOKEN_LENGTH = 20
-)
+HANDLE_COMMAND:
+	for pkt := range prd.C {
+		switch pkt.Command {
+		case CNXN:
+			version := pkt.swapu32(pkt.Arg0)
+			log.Println("Version", version)
+			maxPayload := pkt.Arg1
+			log.Println("MaxPayload:", maxPayload)
+			if maxPayload > 0xFFFF { // UINT16_MAX
+				maxPayload = 0xFFFF
+			}
+			log.Println("MaxPayload:", maxPayload)
 
-func checksum(data []byte) byte {
-	sum := byte(0)
-	for _, c := range data {
-		sum += c
-	}
-	return sum
-}
-
-func xorBytes(a, b []byte) []byte {
-	if len(a) != len(b) {
-		panic(fmt.Sprintf("xorBytes a:%x b:%x have different size", a, b))
-	}
-	dst := make([]byte, len(a))
-	for i := 0; i < len(a); i++ {
-		dst[i] = a[i] ^ b[i]
-	}
-	return dst
-}
-
-type AdbServer struct {
-	version       int
-	mayPayload    int
-	authorized    bool
-	syncToken     int
-	remoteID      int
-	services      map[string]string
-	remoteAddress string
-	token         string
-	signature     string
-}
-
-type PacketReader struct {
-	reader io.Reader
-	err    error
-}
-
-type errReader struct{}
-
-func (e errReader) Read(p []byte) (int, error) {
-	return 0, errors.New("package already read error")
-}
-
-func (p *PacketReader) r() io.Reader {
-	if p.err != nil { // use p.err to short error checks
-		return errReader{}
-	}
-	return p.reader
-}
-
-// Receive packet example
-// 00000000  43 4e 58 4e 01 00 00 01  00 00 10 00 23 00 00 00  |CNXN........#...|
-// 00000010  3c 0d 00 00 bc b1 a7 b1  68 6f 73 74 3a 3a 66 65  |<.......host::fe|
-// 00000020  61 74 75 72 65 73 3d 63  6d 64 2c 73 74 61 74 5f  |atures=cmd,stat_|
-// 00000030  76 32 2c 73 68 65 6c 6c  5f 76 32                 |v2,shell_v2|
-func (p *PacketReader) readPacket() {
-	pkt := Packet{
-		Command: p.readStringN(4),
-		Arg0:    p.readN(4),
-		Arg1:    p.readN(4),
-	}
-
-	var (
-		length = p.readInt32()
-		check  = p.readInt32()
-		magic  = p.readN(4)
-	)
-
-	pkt.Body = p.readN(int(length))
-
-	if p.err != nil {
-		return
-	}
-	if !bytes.Equal(xorBytes([]byte(pkt.Command), magic), []byte{0xff, 0xff, 0xff, 0xff}) {
-		p.err = errors.New("verify magic failed")
-		return
-	}
-	log.Printf("cmd:%s, arg0:%x, arg1:%x, len:%d, check:%d, magic:%x",
-		pkt.Command, pkt.Arg0, pkt.Arg1, length, check, magic)
-
-	log.Println("Body:", string(pkt.Body))
-
-	switch pkt.Command {
-	case "CNXN":
-		var version uint32
-		binary.Read(bytes.NewBuffer(pkt.Arg0), binary.BigEndian, &version)
-		log.Println("Version", version)
-		var maxPayload uint32
-		binary.Read(bytes.NewBuffer(pkt.Arg1), binary.LittleEndian, &maxPayload)
-		log.Println("MaxPayload:", maxPayload)
-		if maxPayload > 0xFFFF { // UINT16_MAX
-			maxPayload = 0xFFFF
+			// Ref link
+			// https://github.com/openstf/adbkit/blob/master/src/adb/tcpusb/socket.coffee
+			token := make([]byte, TOKEN_LENGTH)
+			rand.Read(token)
+			log.Println("Create challenge", base64.StdEncoding.EncodeToString(token))
+			sendData := Packet{
+				Command: AUTH,
+				Arg0:    AUTH_TOKEN,
+				Body:    token,
+			}.EncodeToBytes()
+			stdoutDumper := hex.Dumper(os.Stdout)
+			stdoutDumper.Write(sendData)
+			stdoutDumper.Close()
+			_, err := conn.Write(sendData)
+			if err != nil {
+				log.Println("Err:", err)
+				return
+			}
+		case AUTH:
+			log.Println("Handle conn")
+			break HANDLE_COMMAND
+		default:
+			log.Printf("Unknown command: %#v", pkt)
+			break HANDLE_COMMAND
 		}
-		log.Println("MaxPayload:", maxPayload)
-
-		// Ref link
-		// https://github.com/openstf/adbkit/blob/master/src/adb/tcpusb/socket.coffee
-		make([]byte, TOKEN_LENGTH)
 	}
-
 }
 
-func (p *PacketReader) readN(n int) []byte {
-	buf := make([]byte, n)
-	_, p.err = io.ReadFull(p.r(), buf)
-	return buf
-}
-
-func (p *PacketReader) readStringN(n int) string {
-	return string(p.readN(n))
-}
-
-func (p *PacketReader) readInt32() int32 {
-	var i int32
-	p.err = binary.Read(p.r(), binary.LittleEndian, &i)
-	return i
+// RunAdbServer listen for a address for command `adb connect`
+func RunAdbServer(serial string) error {
+	lis, err := net.Listen("tcp", ":9000")
+	if err != nil {
+		return err
+	}
+	defer lis.Close()
+	conn, err := lis.Accept()
+	if err != nil {
+		return err
+	}
+	handleConnect(conn)
+	return nil
 }
