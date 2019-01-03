@@ -199,6 +199,15 @@ func main() {
 	}
 	app.Commands = []cli.Command{
 		{
+			Name:            "adb",
+			Usage:           "exec adb with device select",
+			SkipFlagParsing: true,
+			Action: func(ctx *cli.Context) error {
+				adbWrap(ctx.Args()...)
+				return nil
+			},
+		},
+		{
 			Name:  "version",
 			Usage: "show version",
 			Action: func(ctx *cli.Context) error {
@@ -244,15 +253,6 @@ func main() {
 			},
 		},
 		{
-			Name:            "adb",
-			Usage:           "exec adb with device select",
-			SkipFlagParsing: true,
-			Action: func(ctx *cli.Context) error {
-				adbWrap(ctx.Args()...)
-				return nil
-			},
-		},
-		{
 			Name:  "screenshot",
 			Usage: "take screenshot",
 			Flags: []cli.Flag{
@@ -267,23 +267,6 @@ func main() {
 				},
 			},
 			Action: actScreenshot,
-		},
-		{
-			Name:      "install",
-			Usage:     "install apk",
-			UsageText: "fa install [ul] <apk-file | url>",
-			// UseShortOptionHandling: true, // not supported in current urfav/cli
-			Flags: []cli.Flag{
-				cli.BoolFlag{
-					Name:  "force, f",
-					Usage: "uninstall if already installed",
-				},
-				cli.BoolFlag{
-					Name:  "launch, l",
-					Usage: "launch after success installed",
-				},
-			},
-			Action: actInstall,
 		},
 		{
 			Name:            "shell",
@@ -314,6 +297,23 @@ func main() {
 				_, err = io.Copy(tty.Output(), rwc)
 				return err
 			},
+		},
+		{
+			Name:      "install",
+			Usage:     "install apk",
+			UsageText: "fa install [ul] <apk-file | url>",
+			// UseShortOptionHandling: true, // not supported in current urfav/cli
+			Flags: []cli.Flag{
+				cli.BoolFlag{
+					Name:  "force, f",
+					Usage: "uninstall if already installed",
+				},
+				cli.BoolFlag{
+					Name:  "launch, l",
+					Usage: "launch after success installed",
+				},
+			},
+			Action: actInstall,
 		},
 		{
 			Name:      "pidcat",
@@ -385,6 +385,23 @@ func main() {
 					return err
 				}
 				log.Println("OKAY")
+				return nil
+			},
+		},
+		{
+			Name:  "watch",
+			Usage: "show newest state when device state change",
+			Action: func(ctx *cli.Context) error {
+				log.Println("Not implemented yet.")
+				return nil
+				client := NewAdbClient()
+				eventC, err := client.Watch()
+				if err != nil {
+					return err
+				}
+				for ev := range eventC {
+					log.Println(ev)
+				}
 				return nil
 			},
 		},

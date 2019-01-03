@@ -150,6 +150,18 @@ func (c *AdbClient) Version() (string, error) {
 	return c.rawVersion()
 }
 
+func (c *AdbClient) Watch() (C chan string, err error) {
+	C = make(chan string, 0)
+	defer close(C)
+	// c.Version()
+	conn, err := c.newConnection()
+	if err != nil {
+		return
+	}
+	conn.WritePacket("host:watchers")
+	return
+}
+
 // Version returns adb server version
 func (c *AdbClient) rawVersion() (string, error) {
 	conn, err := c.newConnection()
