@@ -154,6 +154,8 @@ Libs might be useful
 - <https://github.com/koding/tunnel>
 - <https://github.com/mmatczuk/go-http-tunnel>
 - <https://github.com/inconshreveable/go-tunnel>
+- <https://github.com/labstack/tunnel-client> SSH Tunnel
+- <https://github.com/gliderlabs/ssh> Easy SSH servers in Golang
 
 ## LICENSE
 [MIT](LICENSE)
