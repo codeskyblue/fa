@@ -20,8 +20,8 @@ func main() {
 		RemotePort: 8000,
 		Channel:    make(chan int),
 	}
-	c.TargetHost = "10.246.46.160"
-	c.TargetPort = 8080
+	c.TargetHost = "127.0.0.1"
+	c.TargetPort = 6174
 
 	// Ref: https://github.com/labstack/tunnel-client/blob/master/cmd/root.go
 	res, err := resty.R().

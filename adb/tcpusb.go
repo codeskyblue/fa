@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"strings"
 )
 
 type Session struct {
@@ -55,8 +56,8 @@ func (s *Session) handle() {
 			s.onConnection(pkt)
 		case _AUTH:
 			s.onAuth(pkt)
-		// case _OPEN:
-		// s.onOpen(pkt)
+		case _OPEN:
+			s.onOpen(pkt)
 		default:
 			log.Printf("unknown cmd: %s", pkt.Command)
 			return
@@ -66,6 +67,7 @@ func (s *Session) handle() {
 			break
 		}
 	}
+	log.Println("Session")
 }
 
 func (sess *Session) onConnection(pkt Packet) {
@@ -80,6 +82,23 @@ func (sess *Session) onConnection(pkt Packet) {
 	sess.maxPayload = maxPayload
 	log.Println("MaxPayload:", maxPayload)
 	sess.err = sess.writePacket(_AUTH, AUTH_TOKEN, 0, sess.token)
+	pkt.DumpToStdout()
+}
+
+func (sess *Session) authVerified() {
+	version := swapUint32(1)
+	log.Printf("send version: %x", version)
+	connProps := []string{
+		"ro.product.name=2014011",
+		"ro.product.model=2014011",
+		"ro.product.device=HM2014011",
+	}
+	// connProps = append(connProps, "features=cmd,stat_v2,shell_v2")
+	deviceBanner := "device"
+	payload := fmt.Sprintf("%s::%s", deviceBanner, strings.Join(connProps, ";"))
+	// id := "device::;;\x00"
+	sess.err = sess.writePacket(_CNXN, version, sess.maxPayload, []byte(payload))
+	Packet{_CNXN, sess.version, sess.maxPayload, []byte(payload)}.DumpToStdout()
 }
 
 func (sess *Session) onAuth(pkt Packet) {
@@ -87,21 +106,29 @@ func (sess *Session) onAuth(pkt Packet) {
 	switch pkt.Arg0 {
 	case AUTH_SIGNATURE:
 		sess.signature = pkt.Body
-		log.Printf("Receive signature: %x", base64.StdEncoding.EncodeToString(pkt.Body))
-		sess.err = sess.writePacket(_AUTH, AUTH_TOKEN, 0, sess.token)
+		// The real logic is
+		// If already have rsa_publickey, then verify signature, send CNXN if passed
+		// If no rsa pubkey, then send AUTH to request it
+		// Check signature again and send CNXN if passed
+		log.Printf("Receive signature: %s", base64.StdEncoding.EncodeToString(pkt.Body))
+		// sess.err = sess.writePacket(_AUTH, AUTH_TOKEN, 0, sess.token)
+		sess.authVerified()
 	case AUTH_RSAPUBLICKEY:
 		if sess.signature == nil {
 			sess.err = errors.New("Public key sent before signature")
 			return
 		}
+		log.Printf("Receive public key: %s", pkt.Body)
 		// TODO(ssx): parse public key from body and verify signature
 		// pkt.DumpToStdout()
 		log.Println("receive RSA PublicKey")
+		// pkt.DumpToStdout()
 		// send deviceId
-		log.Printf("send version: %x", sess.version)
-		id := "device::ro.product.name=2014011;ro.product.model=2014011;ro.product.device=HM2014011;\x00"
-		sess.err = sess.writePacket(_CNXN, sess.version, sess.maxPayload, []byte(id))
-		Packet{_CNXN, sess.version, sess.maxPayload, []byte(id)}.DumpToStdout()
+		// time.Sleep(10 * time.Second)
+		// sess.err = errors.New("retry")
+		// adb 1.0.40 will show "failed to authenticate to x.x.x.x:5555"
+		// but actually connected.
+		// sess.authVerified()
 	default:
 		sess.err = fmt.Errorf("unknown authentication method: %d", pkt.Arg0)
 	}
@@ -118,11 +145,13 @@ func RunAdbServer(serial string) error {
 		return err
 	}
 	defer lis.Close()
-	conn, err := lis.Accept()
-	if err != nil {
-		return err
+	for {
+		conn, err := lis.Accept()
+		if err != nil {
+			return err
+		}
+		sess := NewSession(conn)
+		go sess.handle()
 	}
-	sess := NewSession(conn)
-	sess.handle()
 	return nil
 }

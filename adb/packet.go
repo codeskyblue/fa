@@ -31,29 +31,34 @@ func (pkt Packet) magic() []byte {
 }
 
 func (pkt Packet) checksum() uint32 {
-	return checksum(pkt.Body)
+	sum := uint32(0)
+	for _, c := range pkt.Body {
+		sum += uint32(c)
+	}
+	return sum
 }
 
-func (pkt Packet) swapu32(n uint32) uint32 {
-	var i uint32
-	buf := bytes.NewBuffer(nil)
-	binary.Write(buf, binary.LittleEndian, n)
-	binary.Read(buf, binary.BigEndian, &i)
-	return i
+func (pkt Packet) length() uint32 {
+	return uint32(len(pkt.Body))
+}
+
+func (pkt Packet) BodySkipNull() []byte {
+	return bytes.TrimRight(pkt.Body, "\x00")
 }
 
 func (pkt Packet) EncodeToBytes() []byte {
-	buf := bytes.NewBuffer(make([]byte, 0, 24+len(pkt.Body)))
+	payload := pkt.Body // append(pkt.Body, byte(0x00))
+	buf := bytes.NewBuffer(make([]byte, 0, 24+pkt.length()))
 	if len(pkt.Command) != 4 {
 		panic("Invalid command " + strconv.Quote(pkt.Command))
 	}
 	binary.Write(buf, binary.LittleEndian, []byte(pkt.Command))
 	binary.Write(buf, binary.LittleEndian, pkt.Arg0)
 	binary.Write(buf, binary.LittleEndian, pkt.Arg1)
-	binary.Write(buf, binary.LittleEndian, uint32(len(pkt.Body)))
+	binary.Write(buf, binary.LittleEndian, pkt.length())
 	binary.Write(buf, binary.LittleEndian, pkt.checksum())
 	binary.Write(buf, binary.LittleEndian, pkt.magic())
-	buf.Write(pkt.Body)
+	buf.Write(payload)
 	return buf.Bytes()
 }
 
