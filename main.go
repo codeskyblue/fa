@@ -376,6 +376,24 @@ func main() {
 			},
 		},
 		{
+			Name:  "get-serialno",
+			Usage: "print serial-number",
+			Action: func(ctx *cli.Context) error {
+				serial, err := chooseOne()
+				if err != nil {
+					return err
+				}
+				client := NewAdbClient()
+				device := client.DeviceWithSerial(serial)
+				realSerial, err := device.SerialNo()
+				if err != nil {
+					return err
+				}
+				println(realSerial)
+				return nil
+			},
+		},
+		{
 			Name:  "healthcheck",
 			Usage: "check device health status",
 			Action: func(ctx *cli.Context) error {
@@ -392,15 +410,13 @@ func main() {
 			Name:  "watch",
 			Usage: "show newest state when device state change",
 			Action: func(ctx *cli.Context) error {
-				log.Println("Not implemented yet.")
-				return nil
 				client := NewAdbClient()
 				eventC, err := client.Watch()
 				if err != nil {
 					return err
 				}
 				for ev := range eventC {
-					log.Println(ev)
+					println(ev)
 				}
 				return nil
 			},
