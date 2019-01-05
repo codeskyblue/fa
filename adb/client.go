@@ -1,6 +1,7 @@
 package adb
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"io"
@@ -93,15 +94,40 @@ func NewClient(addr string) *Client {
 	}
 }
 
+type DebugProxyConn struct {
+	R io.Reader
+	W io.Writer
+}
+
+func (px DebugProxyConn) Write(data []byte) (int, error) {
+	fmt.Printf("-> %s\n", string(data))
+	return px.W.Write(data)
+}
+
+func (px DebugProxyConn) Read(data []byte) (int, error) {
+	n, err := px.R.Read(data)
+	fmt.Printf("<- %s\n", string(data[0:n]))
+	return n, err
+}
+
 // TODO(ssx): test not passed yet.
 func (c *Client) Version() (string, error) {
 	conn, err := net.Dial("tcp", c.Addr)
 	if err != nil {
 		return "", err
 	}
-	writer := ADBEncoder{conn}
+	defer conn.Close()
+
+	dconn := DebugProxyConn{
+		R: bufio.NewReader(conn),
+		W: conn}
+
+	writer := ADBEncoder{dconn}
 	writer.Encode([]byte("host:version"))
-	reader := ADBDecoder{conn}
+	reader := ADBDecoder{dconn}
+	if err := reader.respCheck(); err != nil {
+		return "", err
+	}
 	return reader.DecodeString()
 }
 
