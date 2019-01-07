@@ -101,6 +101,12 @@ Launch io.appium.android.apis ...
 + adb -s 0123456789ABCDEF shell am start -n io.appium.android.apis/.ApiDemos
 ```
 
+### App
+```
+$ fa app list # show all app package names
+$ fa app list -3 # only show third party packages
+```
+
 ### Shell
 Like `adb shell`, run `fa shell` will open a terminal
 
@@ -135,9 +141,7 @@ The pidcat is very beautiful.
 
 ![pidcat](https://github.com/JakeWharton/pidcat/raw/master/screen.png)
 
-## Reference
-Articles
-
+## Thanks for these Articles and Codes
 - <https://github.com/mzlogin/awesome-adb>
 - [Facebook One World Project](https://code.fb.com/android/managing-resources-for-large-scale-testing/)
 - [Facebook Device Lab](https://code.fb.com/android/the-mobile-device-lab-at-the-prineville-data-center/)
@@ -146,6 +150,9 @@ Articles
 - [ADB Source Code](https://github.com/aosp-mirror/platform_system_core/blob/master/adb)
 - ADB Protocols [OVERVIEW.TXT](https://github.com/aosp-mirror/platform_system_core/blob/master/adb/OVERVIEW.TXT) [SERVICES.TXT](https://github.com/aosp-mirror/platform_system_core/blob/master/adb/SERVICES.TXT) [SYNC.TXT](https://github.com/aosp-mirror/platform_system_core/blob/master/adb/SYNC.TXT)
 - [JakeWharton/pidcat](https://github.com/JakeWharton/pidcat)
+- <https://github.com/wmbest2/android>
+- <https://github.com/zach-klippenstein/goadb>
+
 
 Libs might be useful
 

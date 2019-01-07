@@ -3,6 +3,7 @@ package adb
 import (
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"os"
 	"strings"
@@ -131,10 +132,20 @@ func (d *Device) Stat(path string) (info os.FileInfo, err error) {
 	}
 	rw.Encode([]byte("sync:"))
 	rw.respCheck()
-	rw.Write([]byte("LIST"))
-	rw.Encode([]byte("/data/local/tmp"))
-
-	// rw.Write([]byte("abcd"))
+	rw.WriteString("STAT")
+	// path = "/data/local/tmp/minicap"
+	rw.WriteLE(uint32(len(path)))
+	rw.WriteString(path)
+	id, err := rw.ReadNString(4)
+	if err != nil {
+		return
+	}
+	if id != "STAT" {
+		return nil, fmt.Errorf("Invalid status: %q", id)
+	}
+	mode, _ := rw.ReadUint32()
+	log.Printf("mode: %o", mode)
+	// if path == "STAT"
 	rw.DecodeString()
 	// rw.Encode([]byte("abcd"))
 	return

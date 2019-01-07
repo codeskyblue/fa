@@ -145,13 +145,16 @@ func RunAdbServer(serial string) error {
 		return err
 	}
 	defer lis.Close()
+	return Serve(lis)
+}
+
+func Serve(l net.Listener) error {
 	for {
-		conn, err := lis.Accept()
+		conn, err := l.Accept()
 		if err != nil {
 			return err
 		}
 		sess := NewSession(conn)
 		go sess.handle()
 	}
-	return nil
 }

@@ -31,7 +31,7 @@ func TestKillServer(t *testing.T) {
 
 func TestDeviceStat(t *testing.T) {
 	device := client.Device(AnyUsbDevice())
-	info, err := device.Stat("/sdcard")
+	info, err := device.Stat("/data/local/tmp/")
 	assert.NoError(t, err)
 	// t.Log(t, info)
 	_ = info

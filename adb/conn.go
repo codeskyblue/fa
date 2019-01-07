@@ -2,6 +2,7 @@ package adb
 
 import (
 	"bufio"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -28,6 +29,19 @@ func (conn *ADBConn) Encode(v []byte) error {
 	data := fmt.Sprintf("%04x%s", len(val), val)
 	_, err := conn.Write([]byte(data))
 	return err
+}
+
+func (conn *ADBConn) WriteLE(v interface{}) error {
+	return binary.Write(conn, binary.LittleEndian, v)
+}
+
+func (conn *ADBConn) WriteString(s string) (int, error) {
+	return conn.Write([]byte(s))
+}
+
+func (conn *ADBConn) ReadUint32() (i uint32, err error) {
+	err = binary.Read(conn, binary.LittleEndian, &i)
+	return
 }
 
 func (conn *ADBConn) ReadN(n int) (data []byte, err error) {
@@ -82,7 +96,7 @@ type DebugProxyConn struct {
 
 func (px DebugProxyConn) Write(data []byte) (int, error) {
 	if px.Debug {
-		fmt.Printf("-> %s\n", string(data))
+		fmt.Printf("-> %#v\n", string(data))
 	}
 	return px.W.Write(data)
 }
@@ -90,7 +104,7 @@ func (px DebugProxyConn) Write(data []byte) (int, error) {
 func (px DebugProxyConn) Read(data []byte) (int, error) {
 	n, err := px.R.Read(data)
 	if px.Debug {
-		fmt.Printf("<- %s\n", string(data[0:n]))
+		fmt.Printf("<- %#v\n", string(data[0:n]))
 	}
 	return n, err
 }
