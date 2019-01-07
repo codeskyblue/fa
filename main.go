@@ -253,6 +253,44 @@ func main() {
 			},
 		},
 		{
+			Name:  "app",
+			Usage: "app view and managerment",
+			Subcommands: []cli.Command{
+				{
+					Name:  "list",
+					Usage: "list app",
+					Flags: []cli.Flag{
+						cli.BoolFlag{
+							Name:  "f",
+							Usage: "see their associated file",
+						},
+						cli.BoolFlag{
+							Name:  "s",
+							Usage: "filter to only show system packages",
+						},
+						cli.BoolFlag{
+							Name:  "3",
+							Usage: "filter to only show third party packages",
+						},
+					},
+					Action: func(ctx *cli.Context) error {
+						args := []string{"shell", "pm", "list", "packages"}
+						if ctx.Bool("s") {
+							args = append(args, "-s")
+						}
+						if ctx.Bool("f") {
+							args = append(args, "-f")
+						}
+						if ctx.Bool("3") {
+							args = append(args, "-3")
+						}
+						adbWrap(args...)
+						return nil
+					},
+				},
+			},
+		},
+		{
 			Name:  "screenshot",
 			Usage: "take screenshot",
 			Flags: []cli.Flag{

@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"strconv"
+	"strings"
 )
 
 const (
@@ -131,17 +132,58 @@ func (c *Client) Version() (string, error) {
 	return reader.DecodeString()
 }
 
+func (c *Client) Devices() (devs []*ADevice, err error) {
+	conn, err := net.Dial("tcp", c.Addr)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+	dconn := DebugProxyConn{
+		R: bufio.NewReader(conn),
+		W: conn}
+
+	writer := ADBEncoder{dconn}
+	writer.Encode([]byte("host:devices"))
+	reader := ADBDecoder{dconn}
+	if err := reader.respCheck(); err != nil {
+		return nil, err
+	}
+	lines, err := reader.DecodeString()
+	if err != nil {
+		return nil, err
+	}
+	devs = make([]*ADevice, 0)
+	for _, line := range strings.Split(lines, "\n") {
+		parts := strings.SplitN(line, "\t", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		devs = append(devs, &ADevice{
+			Serial: parts[0],
+			Type:   parts[1],
+		})
+		// devs[parts[0]] = parts[1]
+	}
+	return
+	// regexp.MustCompile(`([\s]+)\t([\w]+)`)
+}
+
 func (c *Client) DeviceWithSerial(serial string) *ADevice {
 	return &ADevice{
 		client: c,
-		serial: serial,
+		Serial: serial,
 	}
 }
 
 // Device
 type ADevice struct {
 	client *Client
-	serial string
+	Serial string
+	Type   string
+}
+
+func (ad *ADevice) String() string {
+	return ad.Serial + ":" + ad.Type
 }
 
 func (ad *ADevice) OpenShell(cmd string) (rwc io.ReadWriteCloser, err error) {
