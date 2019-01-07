@@ -17,6 +17,7 @@ const (
 	_CLSE = "CLSE"
 	_WRTE = "WRTE"
 	_AUTH = "AUTH"
+	_FAIL = "FAIL"
 
 	UINT16_MAX = 0xFFFF
 	UINT32_MAX = 0xFFFFFFFF

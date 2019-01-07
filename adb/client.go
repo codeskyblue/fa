@@ -1,89 +1,12 @@
 package adb
 
 import (
-	"bufio"
-	"errors"
 	"fmt"
 	"io"
 	"net"
-	"strconv"
+	"os"
 	"strings"
 )
-
-const (
-	// _OKAY = "OKAY"
-	_FAIL = "FAIL"
-)
-
-type ADBEncoder struct {
-	wr io.Writer
-}
-
-func (e *ADBEncoder) Encode(v []byte) error {
-	val := string(v)
-	data := fmt.Sprintf("%04x%s", len(val), val)
-	_, err := e.wr.Write([]byte(data))
-	return err
-}
-
-type ADBDecoder struct {
-	rd io.Reader
-}
-
-func (d *ADBDecoder) ReadN(n int) (data []byte, err error) {
-	buf := make([]byte, n)
-	_, err = io.ReadFull(d.rd, buf)
-	if err != nil {
-		return
-	}
-	return buf, nil
-}
-
-func (d *ADBDecoder) ReadNString(n int) (data string, err error) {
-	bdata, err := d.ReadN(n)
-	return string(bdata), err
-}
-
-func (d *ADBDecoder) DecodeString() (string, error) {
-	hexlen, err := d.ReadNString(4)
-	if err != nil {
-		return "", err
-	}
-	var length int
-	_, err = fmt.Sscanf(hexlen, "%04x", &length)
-	if err != nil {
-		return "", err
-	}
-	return d.ReadNString(length)
-}
-
-// respCheck check OKAY, or FAIL
-func (d *ADBDecoder) respCheck() error {
-	status, err := d.ReadNString(4)
-	if err != nil {
-		return err
-	}
-	switch status {
-	case _OKAY:
-		return nil
-	case _FAIL:
-		data, err := d.DecodeString()
-		if err != nil {
-			return err
-		}
-		return errors.New(data)
-	default:
-		return fmt.Errorf("Unexpected response: %s, should be OKAY or FAIL", strconv.Quote(status))
-	}
-}
-
-func assembleString(data string) []byte {
-	pktData := fmt.Sprintf("%04x%s", len(data), data)
-	return []byte(pktData)
-}
-
-// func assembleBytes(data []byte) []byte {
-// }
 
 type Client struct {
 	Addr string
@@ -95,103 +18,126 @@ func NewClient(addr string) *Client {
 	}
 }
 
-type DebugProxyConn struct {
-	R io.Reader
-	W io.Writer
+func (c *Client) roundTrip(data string) (conn net.Conn, rw *ADBConn, err error) {
+	conn, err = net.Dial("tcp", c.Addr)
+	if err != nil {
+		return
+	}
+	rw = NewADBConn(conn)
+	err = rw.Encode([]byte(data))
+	return
 }
 
-func (px DebugProxyConn) Write(data []byte) (int, error) {
-	fmt.Printf("-> %s\n", string(data))
-	return px.W.Write(data)
-}
-
-func (px DebugProxyConn) Read(data []byte) (int, error) {
-	n, err := px.R.Read(data)
-	fmt.Printf("<- %s\n", string(data[0:n]))
-	return n, err
-}
-
-// TODO(ssx): test not passed yet.
-func (c *Client) Version() (string, error) {
-	conn, err := net.Dial("tcp", c.Addr)
+func (c *Client) roundTripSingleResponse(data string) (string, error) {
+	conn, rw, err := c.roundTrip(data)
 	if err != nil {
 		return "", err
 	}
 	defer conn.Close()
-
-	dconn := DebugProxyConn{
-		R: bufio.NewReader(conn),
-		W: conn}
-
-	writer := ADBEncoder{dconn}
-	writer.Encode([]byte("host:version"))
-	reader := ADBDecoder{dconn}
-	if err := reader.respCheck(); err != nil {
+	if err := rw.respCheck(); err != nil {
 		return "", err
 	}
-	return reader.DecodeString()
+	return rw.DecodeString()
 }
 
-func (c *Client) Devices() (devs []*ADevice, err error) {
-	conn, err := net.Dial("tcp", c.Addr)
+// ServerVersion returns int. 39 means 1.0.39
+func (c *Client) ServerVersion() (v int, err error) {
+	verstr, err := c.roundTripSingleResponse("host:version")
 	if err != nil {
-		return nil, err
+		return
 	}
-	defer conn.Close()
-	dconn := DebugProxyConn{
-		R: bufio.NewReader(conn),
-		W: conn}
+	_, err = fmt.Sscanf(verstr, "%x", &v)
+	return
+}
 
-	writer := ADBEncoder{dconn}
-	writer.Encode([]byte("host:devices"))
-	reader := ADBDecoder{dconn}
-	if err := reader.respCheck(); err != nil {
-		return nil, err
-	}
-	lines, err := reader.DecodeString()
+type DeviceState string
+
+const (
+	StateUnauthorized = DeviceState("unauthorized")
+	StateDisconnected = DeviceState("disconnected")
+	StateOffline      = DeviceState("offline")
+	StateOnline       = DeviceState("device")
+)
+
+// ListDevices returns the list of connected devices
+func (c *Client) ListDevices() (devs []*Device, err error) {
+	lines, err := c.roundTripSingleResponse("host:devices")
 	if err != nil {
 		return nil, err
 	}
-	devs = make([]*ADevice, 0)
+
+	devs = make([]*Device, 0)
 	for _, line := range strings.Split(lines, "\n") {
 		parts := strings.SplitN(line, "\t", 2)
 		if len(parts) != 2 {
 			continue
 		}
-		devs = append(devs, &ADevice{
-			Serial: parts[0],
-			Type:   parts[1],
-		})
-		// devs[parts[0]] = parts[1]
+		devs = append(devs, c.Device(DeviceWithSerial(parts[0])))
 	}
 	return
-	// regexp.MustCompile(`([\s]+)\t([\w]+)`)
 }
 
-func (c *Client) DeviceWithSerial(serial string) *ADevice {
-	return &ADevice{
-		client: c,
-		Serial: serial,
+// KillServer tells the server to quit immediately
+func (c *Client) KillServer() error {
+	conn, rw, err := c.roundTrip("host:kill")
+	if err != nil {
+		if _, ok := err.(net.Error); ok { // adb is already stopped if connection refused
+			return nil
+		}
+		return err
 	}
+	defer conn.Close()
+	return rw.respCheck()
+}
+
+func (c *Client) Device(descriptor DeviceDescriptor) *Device {
+	return &Device{
+		client:     c,
+		descriptor: descriptor,
+	}
+}
+
+func (c *Client) DeviceWithSerial(serial string) *Device {
+	return c.Device(DeviceWithSerial(serial))
 }
 
 // Device
-type ADevice struct {
-	client *Client
-	Serial string
-	Type   string
+type Device struct {
+	// serial string // always set
+	// State DeviceState
+
+	descriptor DeviceDescriptor
+	client     *Client
 }
 
-func (ad *ADevice) String() string {
-	return ad.Serial + ":" + ad.Type
+func (d *Device) String() string {
+	return d.descriptor.String()
+	// return fmt.Sprintf("%s:%v", ad.serial, ad.State)
 }
 
-func (ad *ADevice) OpenShell(cmd string) (rwc io.ReadWriteCloser, err error) {
+func (d *Device) OpenShell(cmd string) (rwc io.ReadWriteCloser, err error) {
 	return
 }
 
-func (ad *ADevice) Stat(path string) {
+func (d *Device) Stat(path string) (info os.FileInfo, err error) {
+	req := "host:" + d.descriptor.getTransportDescriptor()
+	conn, rw, err := d.client.roundTrip(req)
+	if err != nil {
+		return
+	}
+	defer conn.Close()
+	if err = rw.respCheck(); err != nil {
+		return
+	}
+	rw.Encode([]byte("sync:"))
+	rw.respCheck()
+	rw.Write([]byte("LIST"))
+	rw.Encode([]byte("/data/local/tmp"))
 
+	// rw.Write([]byte("abcd"))
+	rw.DecodeString()
+	// rw.Encode([]byte("abcd"))
+	return
 }
 
 type PropValue string
@@ -200,6 +146,6 @@ func (p PropValue) Bool() bool {
 	return p == "true"
 }
 
-func (ad *ADevice) Properties() (props map[string]PropValue, err error) {
+func (ad *Device) Properties() (props map[string]PropValue, err error) {
 	return
 }

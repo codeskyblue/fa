@@ -13,6 +13,7 @@ require (
 	github.com/pkg/errors v0.8.0
 	github.com/qiniu/log v0.0.0-20140728010919-a304a74568d6
 	github.com/shogo82148/androidbinary v0.0.0-20180627093851-01c4bfa8b3b5
+	github.com/stretchr/testify v1.2.2
 	golang.org/x/sys v0.0.0-20181213200352-4d1cda033e06 // indirect
 	golang.org/x/tools v0.0.0-20181214171254-3c39ce7b6105 // indirect
 	gopkg.in/cheggaaa/pb.v1 v1.0.27
