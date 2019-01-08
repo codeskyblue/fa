@@ -31,8 +31,7 @@ func TestKillServer(t *testing.T) {
 
 func TestDeviceStat(t *testing.T) {
 	device := client.Device(AnyUsbDevice())
-	info, err := device.Stat("/data/local/tmp/")
+	info, err := device.Stat("/data/local/tmp/minicap")
 	assert.NoError(t, err)
-	// t.Log(t, info)
-	_ = info
+	t.Log(info.Name(), info.Mode().String(), info.Size(), info.ModTime())
 }

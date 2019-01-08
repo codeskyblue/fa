@@ -3,10 +3,10 @@ package adb
 import (
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"os"
 	"strings"
+	"time"
 )
 
 type Client struct {
@@ -120,6 +120,36 @@ func (d *Device) OpenShell(cmd string) (rwc io.ReadWriteCloser, err error) {
 	return
 }
 
+type adbFileInfo struct {
+	name  string
+	mode  os.FileMode
+	size  uint32
+	mtime time.Time
+}
+
+func (f *adbFileInfo) Name() string {
+	return f.name
+}
+
+func (f *adbFileInfo) Size() int64 {
+	return int64(f.size)
+}
+func (f *adbFileInfo) Mode() os.FileMode {
+	return f.mode
+}
+
+func (f *adbFileInfo) ModTime() time.Time {
+	return f.mtime
+}
+
+func (f *adbFileInfo) IsDir() bool {
+	return f.mode.IsDir()
+}
+
+func (f *adbFileInfo) Sys() interface{} {
+	return nil
+}
+
 func (d *Device) Stat(path string) (info os.FileInfo, err error) {
 	req := "host:" + d.descriptor.getTransportDescriptor()
 	conn, rw, err := d.client.roundTrip(req)
@@ -130,12 +160,10 @@ func (d *Device) Stat(path string) (info os.FileInfo, err error) {
 	if err = rw.respCheck(); err != nil {
 		return
 	}
-	rw.Encode([]byte("sync:"))
+	rw.EncodeString("sync:")
 	rw.respCheck()
-	rw.WriteString("STAT")
-	// path = "/data/local/tmp/minicap"
-	rw.WriteLE(uint32(len(path)))
-	rw.WriteString(path)
+	rw.WriteObjects("STAT", uint32(len(path)), path)
+
 	id, err := rw.ReadNString(4)
 	if err != nil {
 		return
@@ -143,12 +171,18 @@ func (d *Device) Stat(path string) (info os.FileInfo, err error) {
 	if id != "STAT" {
 		return nil, fmt.Errorf("Invalid status: %q", id)
 	}
-	mode, _ := rw.ReadUint32()
-	log.Printf("mode: %o", mode)
-	// if path == "STAT"
-	rw.DecodeString()
-	// rw.Encode([]byte("abcd"))
-	return
+	adbMode, _ := rw.ReadUint32()
+	size, _ := rw.ReadUint32()
+	seconds, err := rw.ReadUint32()
+	if err != nil {
+		return nil, err
+	}
+	return &adbFileInfo{
+		name:  path,
+		size:  size,
+		mtime: time.Unix(int64(seconds), 0).Local(),
+		mode:  fileModeFromAdb(adbMode),
+	}, nil
 }
 
 type PropValue string

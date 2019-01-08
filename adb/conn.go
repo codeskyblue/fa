@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"regexp"
 	"strconv"
 )
 
@@ -26,7 +27,11 @@ func NewADBConn(rw io.ReadWriter) *ADBConn {
 
 func (conn *ADBConn) Encode(v []byte) error {
 	val := string(v)
-	data := fmt.Sprintf("%04x%s", len(val), val)
+	return conn.EncodeString(val)
+}
+
+func (conn *ADBConn) EncodeString(s string) error {
+	data := fmt.Sprintf("%04x%s", len(s), s)
 	_, err := conn.Write([]byte(data))
 	return err
 }
@@ -37,6 +42,25 @@ func (conn *ADBConn) WriteLE(v interface{}) error {
 
 func (conn *ADBConn) WriteString(s string) (int, error) {
 	return conn.Write([]byte(s))
+}
+
+// WriteObjects according to type
+func (conn *ADBConn) WriteObjects(objs ...interface{}) error {
+	var err error
+	for _, obj := range objs {
+		switch obj.(type) {
+		case string:
+			_, err = conn.WriteString(obj.(string))
+		case uint32, int32, uint16, int16:
+			err = conn.WriteLE(obj)
+		default:
+			err = fmt.Errorf("Unsupported type: %t", obj)
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (conn *ADBConn) ReadUint32() (i uint32, err error) {
@@ -96,15 +120,33 @@ type DebugProxyConn struct {
 
 func (px DebugProxyConn) Write(data []byte) (int, error) {
 	if px.Debug {
-		fmt.Printf("-> %#v\n", string(data))
+		m := regexp.MustCompile(`^[-:/0-9a-zA-Z]+$`)
+		if m.Match(data) {
+			fmt.Printf("-> %q\n", string(data))
+		} else {
+			fmt.Printf("-> \\x%x\n", reverseBytes(data))
+		}
 	}
 	return px.W.Write(data)
+}
+
+func reverseBytes(b []byte) []byte {
+	out := make([]byte, len(b))
+	for i, c := range b {
+		out[len(b)-i-1] = c
+	}
+	return out
 }
 
 func (px DebugProxyConn) Read(data []byte) (int, error) {
 	n, err := px.R.Read(data)
 	if px.Debug {
-		fmt.Printf("<- %#v\n", string(data[0:n]))
+		m := regexp.MustCompile(`^[-:/0-9a-zA-Z]+$`)
+		if m.Match(data[0:n]) {
+			fmt.Printf("<---- %q\n", string(data[0:n]))
+		} else {
+			fmt.Printf("<---- \\x%x\n", reverseBytes(data[0:n]))
+		}
 	}
 	return n, err
 }
