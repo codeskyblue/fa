@@ -3,10 +3,16 @@ package adb
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
+	"log"
 	"net"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
+
+	shellquote "github.com/kballard/go-shellquote"
+	"github.com/pkg/errors"
 )
 
 type Client struct {
@@ -19,26 +25,40 @@ func NewClient(addr string) *Client {
 	}
 }
 
-func (c *Client) roundTrip(data string) (conn net.Conn, rw *ADBConn, err error) {
-	conn, err = net.Dial("tcp", c.Addr)
+func (c *Client) dial() (conn *ADBConn, err error) {
+	nc, err := net.DialTimeout("tcp", c.Addr, 2*time.Second)
+	log.Println("dial")
+	if err != nil {
+		if err = c.StartServer(); err != nil {
+			err = errors.Wrap(err, "adb start-server")
+			return
+		}
+		nc, err = net.DialTimeout("tcp", c.Addr, 2*time.Second)
+	}
+	return NewADBConn(nc), err
+}
+
+func (c *Client) roundTrip(data string) (conn *ADBConn, err error) {
+	conn, err = c.dial()
 	if err != nil {
 		return
 	}
-	rw = NewADBConn(conn)
-	err = rw.Encode([]byte(data))
+	if len(data) > 0 {
+		err = conn.Encode([]byte(data))
+	}
 	return
 }
 
 func (c *Client) roundTripSingleResponse(data string) (string, error) {
-	conn, rw, err := c.roundTrip(data)
+	conn, err := c.roundTrip(data)
 	if err != nil {
 		return "", err
 	}
 	defer conn.Close()
-	if err := rw.respCheck(); err != nil {
+	if err := conn.Check(); err != nil {
 		return "", err
 	}
-	return rw.DecodeString()
+	return conn.DecodeString()
 }
 
 // ServerVersion returns int. 39 means 1.0.39
@@ -78,9 +98,14 @@ func (c *Client) ListDevices() (devs []*Device, err error) {
 	return
 }
 
+func (c *Client) StartServer() (err error) {
+	cmd := exec.Command("adb", "start-server")
+	return cmd.Run()
+}
+
 // KillServer tells the server to quit immediately
 func (c *Client) KillServer() error {
-	conn, rw, err := c.roundTrip("host:kill")
+	conn, err := c.roundTrip("host:kill")
 	if err != nil {
 		if _, ok := err.(net.Error); ok { // adb is already stopped if connection refused
 			return nil
@@ -88,7 +113,7 @@ func (c *Client) KillServer() error {
 		return err
 	}
 	defer conn.Close()
-	return rw.respCheck()
+	return conn.Check()
 }
 
 func (c *Client) Device(descriptor DeviceDescriptor) *Device {
@@ -104,9 +129,6 @@ func (c *Client) DeviceWithSerial(serial string) *Device {
 
 // Device
 type Device struct {
-	// serial string // always set
-	// State DeviceState
-
 	descriptor DeviceDescriptor
 	client     *Client
 }
@@ -116,8 +138,40 @@ func (d *Device) String() string {
 	// return fmt.Sprintf("%s:%v", ad.serial, ad.State)
 }
 
-func (d *Device) OpenShell(cmd string) (rwc io.ReadWriteCloser, err error) {
+func (d *Device) Serial() (serial string, err error) {
 	return
+}
+
+func (d *Device) OpenTransport() (conn *ADBConn, err error) {
+	return
+}
+
+func (d *Device) OpenShell(cmd string) (rwc io.ReadWriteCloser, err error) {
+	req := "host:" + d.descriptor.getTransportDescriptor()
+	conn, err := d.client.roundTrip(req)
+	if err != nil {
+		return
+	}
+	conn.Check()
+	conn.EncodeString("shell:" + cmd)
+	conn.Check()
+	if conn.Err() != nil {
+		conn.Close()
+	}
+	return conn, conn.Err()
+}
+
+func (d *Device) RunCommand(args ...string) (output string, err error) {
+	cmd := shellquote.Join(args...)
+	rwc, err := d.OpenShell(cmd)
+	if err != nil {
+		return
+	}
+	data, err := ioutil.ReadAll(rwc)
+	if err != nil {
+		return
+	}
+	return string(data), err
 }
 
 type adbFileInfo struct {
@@ -152,28 +206,28 @@ func (f *adbFileInfo) Sys() interface{} {
 
 func (d *Device) Stat(path string) (info os.FileInfo, err error) {
 	req := "host:" + d.descriptor.getTransportDescriptor()
-	conn, rw, err := d.client.roundTrip(req)
+	conn, err := d.client.roundTrip(req)
 	if err != nil {
 		return
 	}
 	defer conn.Close()
-	if err = rw.respCheck(); err != nil {
+	if err = conn.Check(); err != nil {
 		return
 	}
-	rw.EncodeString("sync:")
-	rw.respCheck()
-	rw.WriteObjects("STAT", uint32(len(path)), path)
+	conn.EncodeString("sync:")
+	conn.Check()
+	conn.WriteObjects("STAT", uint32(len(path)), path)
 
-	id, err := rw.ReadNString(4)
+	id, err := conn.ReadNString(4)
 	if err != nil {
 		return
 	}
 	if id != "STAT" {
 		return nil, fmt.Errorf("Invalid status: %q", id)
 	}
-	adbMode, _ := rw.ReadUint32()
-	size, _ := rw.ReadUint32()
-	seconds, err := rw.ReadUint32()
+	adbMode, _ := conn.ReadUint32()
+	size, _ := conn.ReadUint32()
+	seconds, err := conn.ReadUint32()
 	if err != nil {
 		return nil, err
 	}

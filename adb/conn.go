@@ -3,25 +3,30 @@ package adb
 import (
 	"bufio"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"io"
+	"net"
 	"regexp"
 	"strconv"
+
+	"github.com/pkg/errors"
 )
 
 type ADBConn struct {
 	io.ReadWriter
+	io.Closer
+	err error
 }
 
-func NewADBConn(rw io.ReadWriter) *ADBConn {
+func NewADBConn(conn net.Conn) *ADBConn {
 	prw := DebugProxyConn{
-		R:     bufio.NewReader(rw),
-		W:     rw,
+		R:     bufio.NewReader(conn),
+		W:     conn,
 		Debug: true}
 
 	return &ADBConn{
 		ReadWriter: prw,
+		Closer:     conn,
 	}
 }
 
@@ -95,6 +100,18 @@ func (conn *ADBConn) DecodeString() (string, error) {
 	return conn.ReadNString(length)
 }
 
+func (conn *ADBConn) Err() error {
+	return conn.err
+}
+
+func (conn *ADBConn) Check() error {
+	if conn.err != nil {
+		return conn.err
+	}
+	conn.err = conn.respCheck()
+	return conn.err
+}
+
 // respCheck check OKAY, or FAIL
 func (conn *ADBConn) respCheck() error {
 	status, _ := conn.ReadNString(4)
@@ -106,7 +123,7 @@ func (conn *ADBConn) respCheck() error {
 		if err != nil {
 			return err
 		}
-		return errors.New(data)
+		return errors.Wrap(errors.New(data), "respCheck")
 	default:
 		return fmt.Errorf("Unexpected response: %s, should be OKAY or FAIL", strconv.Quote(status))
 	}
@@ -120,7 +137,7 @@ type DebugProxyConn struct {
 
 func (px DebugProxyConn) Write(data []byte) (int, error) {
 	if px.Debug {
-		m := regexp.MustCompile(`^[-:/0-9a-zA-Z]+$`)
+		m := regexp.MustCompile(`^[-:/0-9a-zA-Z ]+$`)
 		if m.Match(data) {
 			fmt.Printf("-> %q\n", string(data))
 		} else {
@@ -141,7 +158,7 @@ func reverseBytes(b []byte) []byte {
 func (px DebugProxyConn) Read(data []byte) (int, error) {
 	n, err := px.R.Read(data)
 	if px.Debug {
-		m := regexp.MustCompile(`^[-:/0-9a-zA-Z]+$`)
+		m := regexp.MustCompile(`^[-:/0-9a-zA-Z ]+$`)
 		if m.Match(data[0:n]) {
 			fmt.Printf("<---- %q\n", string(data[0:n]))
 		} else {

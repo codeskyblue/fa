@@ -2,6 +2,7 @@ package adb
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -27,11 +28,23 @@ func TestDevices(t *testing.T) {
 func TestKillServer(t *testing.T) {
 	err := client.KillServer()
 	assert.NoError(t, err)
+	time.Sleep(2 * time.Second)
 }
 
 func TestDeviceStat(t *testing.T) {
 	device := client.Device(AnyUsbDevice())
 	info, err := device.Stat("/data/local/tmp/minicap")
-	assert.NoError(t, err)
+	if !assert.NoError(t, err) {
+		return
+	}
 	t.Log(info.Name(), info.Mode().String(), info.Size(), info.ModTime())
+}
+
+func TestDeviceRunCommand(t *testing.T) {
+	device := client.Device(AnyUsbDevice())
+	output, err := device.RunCommand("pwd")
+	if !assert.NoError(t, err) {
+		return
+	}
+	assert.Equal(t, "/\n", output)
 }
