@@ -445,6 +445,23 @@ func main() {
 			},
 		},
 		{
+			Name:  "share",
+			Usage: "TODO: share device as address for adb connect",
+			Action: func(ctx *cli.Context) error {
+				log.Println("NotImplemented")
+				return nil
+				// serial, err := chooseOne()
+				// if err != nil {
+				// 	return err
+				// }
+				// ln, err := tunnel.New(nil).Listen()
+				// if err != nil {
+				// 	return err
+				// }
+				// return adb.DeviceWithSerial(serial).Serve(ln)
+			},
+		},
+		{
 			Name:  "watch",
 			Usage: "show newest state when device state change",
 			Action: func(ctx *cli.Context) error {
