@@ -22,7 +22,7 @@ func NewADBConn(conn net.Conn) *ADBConn {
 	proxyRW := debugProxyConn{
 		R:     bufio.NewReader(conn),
 		W:     conn,
-		Debug: true}
+		Debug: false}
 
 	return &ADBConn{
 		rw:     proxyRW,

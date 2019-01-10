@@ -6,7 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+
+	"github.com/qiniu/log"
 )
 
 const (
@@ -29,7 +30,12 @@ const (
 	TOKEN_LENGTH = 20
 )
 
-func checksum(data []byte) uint32 {
+var (
+	ErrChecksum   = errors.New("adb: checksum error")
+	ErrCheckMagic = errors.New("adb: magic error")
+)
+
+func calculateChecksum(data []byte) uint32 {
 	sum := uint32(0)
 	for _, c := range data {
 		sum += uint32(c)
@@ -120,9 +126,9 @@ func (p *PacketReader) readPacket() (pkt Packet, err error) {
 	}
 
 	var (
-		length    = p.readUint32()
-		checksum_ = p.readUint32()
-		magic     = p.readN(4)
+		length   = p.readUint32()
+		checksum = p.readUint32()
+		magic    = p.readN(4)
 	)
 
 	pkt.Body = p.readN(int(length))
@@ -131,21 +137,15 @@ func (p *PacketReader) readPacket() (pkt Packet, err error) {
 		return
 	}
 	if !bytes.Equal(xorBytes([]byte(pkt.Command), magic), []byte{0xff, 0xff, 0xff, 0xff}) {
-		p.err = errors.New("verify magic failed")
+		p.err = ErrCheckMagic
 		log.Printf("%x %x %x", []byte(pkt.Command), magic, xorBytes([]byte(pkt.Command), magic))
 		return
 	}
 	log.Printf("cmd:%s, arg0:%x, arg1:%x, len:%d, check:%x, magic:%x",
-		pkt.Command, pkt.Arg0, pkt.Arg1, length, checksum_, magic)
-	log.Printf("checksum: %x", checksum(pkt.Body))
-	if checksum(pkt.Body) != checksum_ {
-		p.err = errors.New("checksum failed")
+		pkt.Command, pkt.Arg0, pkt.Arg1, length, checksum, magic)
+	if calculateChecksum(pkt.Body) != checksum {
+		p.err = ErrChecksum
 	}
-	// log.Println("Body:", string(pkt.Body))
-	// log.Println("Recv Body ----")
-	// dumper := hex.Dumper(os.Stdout)
-	// dumper.Write(pkt.Body)
-	// dumper.Close()
 	return pkt, p.err
 }
 

@@ -15,33 +15,65 @@ import (
 )
 
 type TransportService struct {
-	opened            bool
 	sess              *Session
 	device            *Device
-	localId, remoteId uint32
 	transport         *ADBConn
+	localId, remoteId uint32
+	opened            bool
+	ended             bool
+	once              sync.Once
 }
 
 func (t *TransportService) handle(pkt Packet) {
 	switch pkt.Command {
-	// case _OPEN:
-	// 	t.handleOpenPacket(pkt)
+	case _OPEN:
+		t.handleOpenPacket(pkt)
 	case _OKAY:
-		t.handleOkayPacket(pkt)
+		// Just ingore
+	case _WRTE:
+		t.handleWritePacket(pkt)
+	case _CLSE:
+		t.handleClosePacket(pkt)
 	}
 }
 
-// func (t *TransportService) handleOpenPacket(pkt Packet){
+func (t *TransportService) handleOpenPacket(pkt Packet) {
+	t.writePacket(_OKAY, nil)
 
-// }
+	go func() {
+		buf := make([]byte, t.sess.maxPayload)
+		for {
+			n, err := t.transport.Read(buf)
+			if n > 0 {
+				t.writePacket(_WRTE, buf[0:n])
+			}
+			if err != nil {
+				t.end()
+				break
+			}
+		}
+	}()
+}
 
-func (t *TransportService) handleOkayPacket(pkt Packet) {
-	buf := make([]byte, 1024)
-	n, err := t.transport.Read(buf)
-	if err != nil {
-		t.sess.err = errors.Wrap(err, "copy data")
-	}
-	t.sess.writePacket(_WRTE, t.localId, t.remoteId, buf[0:n])
+func (t *TransportService) handleWritePacket(pkt Packet) {
+	t.transport.Write(pkt.Body)
+	t.writePacket(_OKAY, nil)
+}
+
+func (t *TransportService) handleClosePacket(pkt Packet) {
+	t.end()
+}
+
+func (t *TransportService) end() {
+	t.once.Do(func() {
+		t.ended = true
+		t.transport.Close()
+		t.writePacket(_CLSE, nil)
+	})
+}
+
+func (t *TransportService) writePacket(oper string, data []byte) {
+	t.sess.writePacket(oper, t.localId, t.remoteId, data)
 }
 
 type Session struct {
@@ -82,13 +114,18 @@ func (s *Session) nextLocalId() uint32 {
 }
 
 func (s *Session) writePacket(cmd string, arg0, arg1 uint32, body []byte) error {
-	_, err := Packet{
+	s.mu.Lock()
+	defer s.mu.Unlock() // FIXME(ssx): need to improve performance
+	if s.err != nil {
+		return s.err
+	}
+	_, s.err = Packet{
 		Command: cmd,
 		Arg0:    arg0,
 		Arg1:    arg1,
 		Body:    body,
 	}.WriteTo(s.conn)
-	return err
+	return s.err
 }
 
 func (s *Session) Serve() {
@@ -113,7 +150,7 @@ func (s *Session) Serve() {
 			break
 		}
 	}
-	log.Println("Session")
+	log.Println("session closed")
 }
 
 func (sess *Session) onConnection(pkt Packet) {
@@ -203,13 +240,10 @@ func (sess *Session) onOpen(pkt Packet) {
 		return
 	}
 
-	sess.writePacket(_OKAY, localId, remoteId, nil)
-
 	service := &TransportService{
 		localId:   localId,
 		remoteId:  remoteId,
 		sess:      sess,
-		opened:    false,
 		transport: conn,
 	}
 
@@ -217,19 +251,7 @@ func (sess *Session) onOpen(pkt Packet) {
 	sess.services[localId] = service
 	sess.mu.Unlock()
 
-	go func() {
-		buf := make([]byte, 1024)
-		for sess.err == nil {
-			n, err := conn.Read(buf)
-			if err != nil {
-				sess.err = errors.Wrap(err, "copy data")
-			}
-			sess.writePacket(_WRTE, localId, remoteId, buf[0:n])
-		}
-	}()
-	// sess.writePacket(_OKAY)
-	// Packet{}
-
+	service.handle(pkt)
 	pkt.DumpToStdout()
 }
 
@@ -239,6 +261,7 @@ func (sess *Session) forwardServicePacket(pkt Packet) {
 	sess.mu.Unlock()
 	if !ok {
 		sess.err = errors.New("transport service already closed")
+		return
 	}
 	service.handle(pkt)
 }

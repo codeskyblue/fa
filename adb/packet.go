@@ -43,7 +43,10 @@ func (pkt Packet) length() uint32 {
 }
 
 func (pkt Packet) BodySkipNull() []byte {
-	return bytes.TrimRight(pkt.Body, "\x00")
+	if len(pkt.Body) >= 1 && pkt.Body[len(pkt.Body)-1] == byte(0) {
+		return pkt.Body[0 : len(pkt.Body)-1]
+	}
+	return pkt.Body
 }
 
 func (pkt Packet) EncodeToBytes() []byte {
