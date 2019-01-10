@@ -46,7 +46,7 @@ func (s *Session) writePacket(cmd string, arg0, arg1 uint32, body []byte) error 
 	return err
 }
 
-func (s *Session) handle() {
+func (s *Session) Serve() {
 	defer s.conn.Close()
 	pr := NewPacketReader(s.conn)
 
@@ -155,6 +155,6 @@ func Serve(l net.Listener) error {
 			return err
 		}
 		sess := NewSession(conn)
-		go sess.handle()
+		go sess.Serve()
 	}
 }

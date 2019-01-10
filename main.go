@@ -7,6 +7,8 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,10 +16,13 @@ import (
 	"runtime"
 	"strings"
 	"syscall"
+	"time"
 
 	shellquote "github.com/kballard/go-shellquote"
 	tty "github.com/mattn/go-tty"
 
+	"github.com/codeskyblue/fa/adb"
+	"github.com/codeskyblue/fa/tunnel"
 	"github.com/manifoldco/promptui"
 	cli "gopkg.in/urfave/cli.v1"
 )
@@ -448,7 +453,37 @@ func main() {
 			Name:  "share",
 			Usage: "TODO: share device as address for adb connect",
 			Action: func(ctx *cli.Context) error {
-				log.Println("NotImplemented")
+				// log.Println("NotImplemented")
+				// return nil
+
+				http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+					io.WriteString(w, "Hello world!")
+				})
+
+				c := &tunnel.Configuration{
+					Host:       "labstack.me:22",
+					RemoteHost: "0.0.0.0",
+					RemotePort: 8000,
+					Channel:    make(chan int),
+					InBoundConnectionHook: func(in net.Conn) error {
+						log.Println("Accept new connection", in.RemoteAddr().String())
+						// http.Serve()
+						// http.Serve
+						adb.NewSession(in).Serve()
+						io.WriteString(in, "Nice to meed you")
+						in.Close()
+						return nil
+					},
+				}
+
+			CREATE:
+				go tunnel.Create(c)
+				event := <-c.Channel
+				if event == tunnel.EventReconnect {
+					log.Println("trying to reconnect")
+					time.Sleep(1 * time.Second)
+					goto CREATE
+				}
 				return nil
 				// serial, err := chooseOne()
 				// if err != nil {

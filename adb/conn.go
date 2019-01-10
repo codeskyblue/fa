@@ -13,21 +13,43 @@ import (
 )
 
 type ADBConn struct {
-	io.ReadWriter
+	rw io.ReadWriter
 	io.Closer
 	err error
 }
 
 func NewADBConn(conn net.Conn) *ADBConn {
-	prw := DebugProxyConn{
+	proxyRW := debugProxyConn{
 		R:     bufio.NewReader(conn),
 		W:     conn,
 		Debug: true}
 
 	return &ADBConn{
-		ReadWriter: prw,
-		Closer:     conn,
+		rw:     proxyRW,
+		Closer: conn,
 	}
+}
+
+func (conn *ADBConn) Err() error {
+	return conn.err
+}
+
+func (conn *ADBConn) Read(p []byte) (n int, err error) {
+	if conn.err != nil {
+		return 0, conn.err
+	}
+	n, err = conn.rw.Read(p)
+	conn.err = err
+	return
+}
+
+func (conn *ADBConn) Write(p []byte) (n int, err error) {
+	if conn.err != nil {
+		return 0, conn.err
+	}
+	n, err = conn.rw.Write(p)
+	conn.err = err
+	return
 }
 
 func (conn *ADBConn) Encode(v []byte) error {
@@ -100,20 +122,8 @@ func (conn *ADBConn) DecodeString() (string, error) {
 	return conn.ReadNString(length)
 }
 
-func (conn *ADBConn) Err() error {
-	return conn.err
-}
-
-func (conn *ADBConn) Check() error {
-	if conn.err != nil {
-		return conn.err
-	}
-	conn.err = conn.respCheck()
-	return conn.err
-}
-
-// respCheck check OKAY, or FAIL
-func (conn *ADBConn) respCheck() error {
+// CheckOKAY check OKAY, or FAIL
+func (conn *ADBConn) CheckOKAY() error {
 	status, _ := conn.ReadNString(4)
 	switch status {
 	case _OKAY:
@@ -129,13 +139,13 @@ func (conn *ADBConn) respCheck() error {
 	}
 }
 
-type DebugProxyConn struct {
+type debugProxyConn struct {
 	R     io.Reader
 	W     io.Writer
 	Debug bool
 }
 
-func (px DebugProxyConn) Write(data []byte) (int, error) {
+func (px debugProxyConn) Write(data []byte) (int, error) {
 	if px.Debug {
 		m := regexp.MustCompile(`^[-:/0-9a-zA-Z ]+$`)
 		if m.Match(data) {
@@ -155,7 +165,7 @@ func reverseBytes(b []byte) []byte {
 	return out
 }
 
-func (px DebugProxyConn) Read(data []byte) (int, error) {
+func (px debugProxyConn) Read(data []byte) (int, error) {
 	n, err := px.R.Read(data)
 	if px.Debug {
 		m := regexp.MustCompile(`^[-:/0-9a-zA-Z ]+$`)

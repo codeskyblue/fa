@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net"
 	"os"
 	"os/exec"
@@ -27,7 +26,6 @@ func NewClient(addr string) *Client {
 
 func (c *Client) dial() (conn *ADBConn, err error) {
 	nc, err := net.DialTimeout("tcp", c.Addr, 2*time.Second)
-	log.Println("dial")
 	if err != nil {
 		if err = c.StartServer(); err != nil {
 			err = errors.Wrap(err, "adb start-server")
@@ -55,7 +53,7 @@ func (c *Client) roundTripSingleResponse(data string) (string, error) {
 		return "", err
 	}
 	defer conn.Close()
-	if err := conn.Check(); err != nil {
+	if err := conn.CheckOKAY(); err != nil {
 		return "", err
 	}
 	return conn.DecodeString()
@@ -113,7 +111,7 @@ func (c *Client) KillServer() error {
 		return err
 	}
 	defer conn.Close()
-	return conn.Check()
+	return conn.CheckOKAY()
 }
 
 func (c *Client) Device(descriptor DeviceDescriptor) *Device {
@@ -142,8 +140,20 @@ func (d *Device) Serial() (serial string, err error) {
 	return
 }
 
+// OpenTransport is a low level function
+// Connect to adbd.exe and send <host-prefix>:transport and check OKAY
+// conn should be Close after using
 func (d *Device) OpenTransport() (conn *ADBConn, err error) {
-	return
+	req := "host:" + d.descriptor.getTransportDescriptor()
+	conn, err = d.client.roundTrip(req)
+	if err != nil {
+		return
+	}
+	conn.CheckOKAY()
+	if conn.Err() != nil {
+		conn.Close()
+	}
+	return conn, conn.Err()
 }
 
 func (d *Device) OpenShell(cmd string) (rwc io.ReadWriteCloser, err error) {
@@ -152,9 +162,9 @@ func (d *Device) OpenShell(cmd string) (rwc io.ReadWriteCloser, err error) {
 	if err != nil {
 		return
 	}
-	conn.Check()
+	conn.CheckOKAY()
 	conn.EncodeString("shell:" + cmd)
-	conn.Check()
+	conn.CheckOKAY()
 	if conn.Err() != nil {
 		conn.Close()
 	}
@@ -211,11 +221,11 @@ func (d *Device) Stat(path string) (info os.FileInfo, err error) {
 		return
 	}
 	defer conn.Close()
-	if err = conn.Check(); err != nil {
+	if err = conn.CheckOKAY(); err != nil {
 		return
 	}
 	conn.EncodeString("sync:")
-	conn.Check()
+	conn.CheckOKAY()
 	conn.WriteObjects("STAT", uint32(len(path)), path)
 
 	id, err := conn.ReadNString(4)
