@@ -19,6 +19,9 @@ type Client struct {
 }
 
 func NewClient(addr string) *Client {
+	if addr == "" {
+		addr = "127.0.0.1:5037"
+	}
 	return &Client{
 		Addr: addr,
 	}

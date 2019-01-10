@@ -5,12 +5,44 @@ package adb
 import (
 	"crypto/rand"
 	"encoding/base64"
-	"errors"
 	"fmt"
-	"log"
 	"net"
 	"strings"
+	"sync"
+
+	"github.com/pkg/errors"
+	"github.com/qiniu/log"
 )
+
+type TransportService struct {
+	opened            bool
+	sess              *Session
+	device            *Device
+	localId, remoteId uint32
+	transport         *ADBConn
+}
+
+func (t *TransportService) handle(pkt Packet) {
+	switch pkt.Command {
+	// case _OPEN:
+	// 	t.handleOpenPacket(pkt)
+	case _OKAY:
+		t.handleOkayPacket(pkt)
+	}
+}
+
+// func (t *TransportService) handleOpenPacket(pkt Packet){
+
+// }
+
+func (t *TransportService) handleOkayPacket(pkt Packet) {
+	buf := make([]byte, 1024)
+	n, err := t.transport.Read(buf)
+	if err != nil {
+		t.sess.err = errors.Wrap(err, "copy data")
+	}
+	t.sess.writePacket(_WRTE, t.localId, t.remoteId, buf[0:n])
+}
 
 type Session struct {
 	conn          net.Conn
@@ -20,6 +52,11 @@ type Session struct {
 	version       uint32
 	maxPayload    uint32
 	remoteAddress string
+	services      map[uint32]*TransportService
+
+	mu             sync.Mutex
+	tmpLocalIdLock sync.Mutex
+	tmpLocalId     uint32
 }
 
 func NewSession(conn net.Conn) *Session {
@@ -33,7 +70,15 @@ func NewSession(conn net.Conn) *Session {
 		token:         token,
 		version:       1,
 		remoteAddress: conn.RemoteAddr().String(),
+		services:      make(map[uint32]*TransportService),
 	}
+}
+
+func (s *Session) nextLocalId() uint32 {
+	s.tmpLocalIdLock.Lock()
+	defer s.tmpLocalIdLock.Unlock()
+	s.tmpLocalId += 1
+	return s.tmpLocalId
 }
 
 func (s *Session) writePacket(cmd string, arg0, arg1 uint32, body []byte) error {
@@ -58,9 +103,10 @@ func (s *Session) Serve() {
 			s.onAuth(pkt)
 		case _OPEN:
 			s.onOpen(pkt)
+		case _OKAY, _WRTE, _CLSE:
+			s.forwardServicePacket(pkt)
 		default:
-			log.Printf("unknown cmd: %s", pkt.Command)
-			return
+			s.err = errors.New("unknown cmd: " + pkt.Command)
 		}
 		if s.err != nil {
 			log.Printf("unexpect err: %v", s.err)
@@ -135,7 +181,66 @@ func (sess *Session) onAuth(pkt Packet) {
 }
 
 func (sess *Session) onOpen(pkt Packet) {
+	remoteId := pkt.Arg0
+	localId := sess.nextLocalId()
+	if len(pkt.Body) < 2 {
+		sess.err = errors.New("empty service name")
+		return // Not throw error ?
+	}
+	name := string(pkt.BodySkipNull())
+	log.Infof("Calling #%s, remoteId: %d, localId: %d", name, remoteId, localId)
+
+	// Session service
+	device := NewClient("").Device(AnyUsbDevice())
+	conn, err := device.OpenTransport()
+	if err != nil {
+		sess.err = err
+		return
+	}
+	conn.Encode(pkt.BodySkipNull())
+	if err := conn.CheckOKAY(); err != nil {
+		sess.err = errors.Wrap(err, "session.OPEN")
+		return
+	}
+
+	sess.writePacket(_OKAY, localId, remoteId, nil)
+
+	service := &TransportService{
+		localId:   localId,
+		remoteId:  remoteId,
+		sess:      sess,
+		opened:    false,
+		transport: conn,
+	}
+
+	sess.mu.Lock()
+	sess.services[localId] = service
+	sess.mu.Unlock()
+
+	go func() {
+		buf := make([]byte, 1024)
+		for sess.err == nil {
+			n, err := conn.Read(buf)
+			if err != nil {
+				sess.err = errors.Wrap(err, "copy data")
+			}
+			sess.writePacket(_WRTE, localId, remoteId, buf[0:n])
+		}
+	}()
+	// sess.writePacket(_OKAY)
+	// Packet{}
+
 	pkt.DumpToStdout()
+}
+
+func (sess *Session) forwardServicePacket(pkt Packet) {
+	sess.mu.Lock()
+	service, ok := sess.services[pkt.Arg1] // localId
+	sess.mu.Unlock()
+	if !ok {
+		sess.err = errors.New("transport service already closed")
+	}
+	service.handle(pkt)
 }
 
 // RunAdbServer listen for a address for command `adb connect`
