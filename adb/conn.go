@@ -63,6 +63,7 @@ func (conn *ADBConn) EncodeString(s string) error {
 	return err
 }
 
+// write data with little endian
 func (conn *ADBConn) WriteLE(v interface{}) error {
 	return binary.Write(conn, binary.LittleEndian, v)
 }

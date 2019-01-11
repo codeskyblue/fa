@@ -141,8 +141,8 @@ func (p *PacketReader) readPacket() (pkt Packet, err error) {
 		log.Printf("%x %x %x", []byte(pkt.Command), magic, xorBytes([]byte(pkt.Command), magic))
 		return
 	}
-	log.Printf("cmd:%s, arg0:%x, arg1:%x, len:%d, check:%x, magic:%x",
-		pkt.Command, pkt.Arg0, pkt.Arg1, length, checksum, magic)
+	// log.Printf("cmd:%s, arg0:%x, arg1:%x, len:%d, check:%x, magic:%x",
+	// 	pkt.Command, pkt.Arg0, pkt.Arg1, length, checksum, magic)
 	if calculateChecksum(pkt.Body) != checksum {
 		p.err = ErrChecksum
 	}

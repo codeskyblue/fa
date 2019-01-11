@@ -1,5 +1,6 @@
 # fa = fast adb
 [![Build Status](https://travis-ci.org/codeskyblue/fa.svg?branch=master)](https://travis-ci.org/codeskyblue/fa)
+[![GoDoc](https://godoc.org/github.com/codeskyblue/fa/adb?status.svg)](https://godoc.org/github.com/codeskyblue/fa/adb)
 
 `fa` is a command line tool that wraps `adb` in order to extend it with extra features and commands that make working with Android easier.
 
@@ -37,7 +38,7 @@ download binary from [**releases**](https://github.com/codeskyblue/fa/releases)
 ```bash
 $ fa version
 fa version v0.0.5 # just example
-adb server version 0028
+adb server version 28
 ```
 
 ### Show devices
@@ -46,6 +47,11 @@ adb server version 0028
 ```bash
 $ fa devices
 3578298f        device
+
+$ fa devices --json
+[
+   {"serial": "3578298f", "status": "device"}
+]
 ```
 
 ### Run adb command with device select
@@ -142,6 +148,7 @@ The pidcat is very beautiful.
 ![pidcat](https://github.com/JakeWharton/pidcat/raw/master/screen.png)
 
 ## Thanks for these Articles and Codes
+- <https://labstack.com/docs/tunnel>
 - <https://github.com/mzlogin/awesome-adb>
 - [Facebook One World Project](https://code.fb.com/android/managing-resources-for-large-scale-testing/)
 - [Facebook Device Lab](https://code.fb.com/android/the-mobile-device-lab-at-the-prineville-data-center/)
