@@ -13,13 +13,15 @@
 - [x] support `fa shell`
 - [x] colorful logcat and filter with package name
 - [ ] install apk and auto click confirm
-- [.] check device health status
+- [ ] check device health status
 - [ ] show current app
 - [ ] unlock device
 - [ ] reset device state, clean up installed packages
 - [ ] show wlan (ip,mac,signal), enable and disable it
-- [ ] share device to public web
+- [x] share device to public web
+- [ ] fa share-server
 - [ ] install ipa support
+- [x] fahub service
 
 ## Install
 **For mac**
@@ -124,6 +126,23 @@ You can just run
 $ fa shell busybox ls
 # using adb shell you have to
 $ adb shell /data/local/tmp/busybox ls
+```
+
+### Share
+Share local device
+
+```bash
+$ fa share
+# here will print a address, eg: tcp://max.labstack.me:8000
+```
+
+In another machine use `adb connect`, for example the share addr is `max.labstack.me:8000`
+
+```bash
+$ adb connect max.labstack.me:8000
+device connected
+$ adb -s max.labstack.me:8000 shell pwd
+/
 ```
 
 ### Pidcat (logcat)

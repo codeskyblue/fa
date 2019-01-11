@@ -54,18 +54,6 @@ func xorBytes(a, b []byte) []byte {
 	return dst
 }
 
-type AdbServer struct {
-	version       int
-	mayPayload    int
-	authorized    bool
-	syncToken     int
-	remoteID      int
-	services      map[string]string
-	remoteAddress string
-	token         string
-	signature     string
-}
-
 type PacketReader struct {
 	C      chan Packet
 	reader io.Reader

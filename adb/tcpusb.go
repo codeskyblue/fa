@@ -14,69 +14,9 @@ import (
 	"github.com/qiniu/log"
 )
 
-type TransportService struct {
-	sess              *Session
-	device            *Device
-	transport         *ADBConn
-	localId, remoteId uint32
-	opened            bool
-	ended             bool
-	once              sync.Once
-}
-
-func (t *TransportService) handle(pkt Packet) {
-	switch pkt.Command {
-	case _OPEN:
-		t.handleOpenPacket(pkt)
-	case _OKAY:
-		// Just ingore
-	case _WRTE:
-		t.handleWritePacket(pkt)
-	case _CLSE:
-		t.handleClosePacket(pkt)
-	}
-}
-
-func (t *TransportService) handleOpenPacket(pkt Packet) {
-	t.writePacket(_OKAY, nil)
-
-	go func() {
-		buf := make([]byte, t.sess.maxPayload)
-		for {
-			n, err := t.transport.Read(buf)
-			if n > 0 {
-				t.writePacket(_WRTE, buf[0:n])
-			}
-			if err != nil {
-				t.end()
-				break
-			}
-		}
-	}()
-}
-
-func (t *TransportService) handleWritePacket(pkt Packet) {
-	t.transport.Write(pkt.Body)
-	t.writePacket(_OKAY, nil)
-}
-
-func (t *TransportService) handleClosePacket(pkt Packet) {
-	t.end()
-}
-
-func (t *TransportService) end() {
-	t.once.Do(func() {
-		t.ended = true
-		t.transport.Close()
-		t.writePacket(_CLSE, nil)
-	})
-}
-
-func (t *TransportService) writePacket(oper string, data []byte) {
-	t.sess.writePacket(oper, t.localId, t.remoteId, data)
-}
-
-type Session struct {
+// Session created when adb connected
+type Session struct { // adbSession
+	device        *Device
 	conn          net.Conn
 	signature     []byte
 	err           error
@@ -91,13 +31,14 @@ type Session struct {
 	tmpLocalId     uint32
 }
 
-func NewSession(conn net.Conn) *Session {
+func NewSession(conn net.Conn, device *Device) *Session {
 	// generate challenge
 	token := make([]byte, TOKEN_LENGTH)
 	rand.Read(token)
 	log.Println("Create challenge", base64.StdEncoding.EncodeToString(token))
 
 	return &Session{
+		device:        device,
 		conn:          conn,
 		token:         token,
 		version:       1,
@@ -154,23 +95,22 @@ func (s *Session) Serve() {
 }
 
 func (sess *Session) onConnection(pkt Packet) {
-	// version := pkt.swapu32(pkt.Arg0)
 	sess.version = pkt.Arg0
 	log.Printf("Version: %x", pkt.Arg0)
 	maxPayload := pkt.Arg1
-	log.Println("MaxPayload:", maxPayload)
+	// log.Println("MaxPayload:", maxPayload)
 	if maxPayload > 0xFFFF { // UINT16_MAX
 		maxPayload = 0xFFFF
 	}
 	sess.maxPayload = maxPayload
-	log.Println("MaxPayload:", maxPayload)
+	// log.Println("MaxPayload:", maxPayload)
 	sess.err = sess.writePacket(_AUTH, AUTH_TOKEN, 0, sess.token)
 	pkt.DumpToStdout()
 }
 
 func (sess *Session) authVerified() {
 	version := swapUint32(1)
-	log.Printf("send version: %x", version)
+	// FIXME(ssx): need device.Properties()
 	connProps := []string{
 		"ro.product.name=2014011",
 		"ro.product.model=2014011",
@@ -266,23 +206,64 @@ func (sess *Session) forwardServicePacket(pkt Packet) {
 	service.handle(pkt)
 }
 
-// RunAdbServer listen for a address for command `adb connect`
-func RunAdbServer(serial string) error {
-	lis, err := net.Listen("tcp", ":9000")
-	if err != nil {
-		return err
-	}
-	defer lis.Close()
-	return Serve(lis)
+type TransportService struct {
+	sess              *Session
+	device            *Device
+	transport         *ADBConn
+	localId, remoteId uint32
+	opened            bool
+	ended             bool
+	once              sync.Once
 }
 
-func Serve(l net.Listener) error {
-	for {
-		conn, err := l.Accept()
-		if err != nil {
-			return err
-		}
-		sess := NewSession(conn)
-		go sess.Serve()
+func (t *TransportService) handle(pkt Packet) {
+	switch pkt.Command {
+	case _OPEN:
+		t.handleOpenPacket(pkt)
+	case _OKAY:
+		// Just ingore
+	case _WRTE:
+		t.handleWritePacket(pkt)
+	case _CLSE:
+		t.handleClosePacket(pkt)
 	}
+}
+
+func (t *TransportService) handleOpenPacket(pkt Packet) {
+	t.writePacket(_OKAY, nil)
+
+	go func() {
+		buf := make([]byte, t.sess.maxPayload)
+		for {
+			n, err := t.transport.Read(buf)
+			if n > 0 {
+				t.writePacket(_WRTE, buf[0:n])
+			}
+			if err != nil {
+				t.end()
+				break
+			}
+		}
+	}()
+}
+
+func (t *TransportService) handleWritePacket(pkt Packet) {
+	t.transport.Write(pkt.Body)
+	t.writePacket(_OKAY, nil)
+}
+
+func (t *TransportService) handleClosePacket(pkt Packet) {
+	t.end()
+}
+
+func (t *TransportService) end() {
+	t.once.Do(func() {
+		t.ended = true
+		t.transport.Close()
+		t.writePacket(_CLSE, nil)
+	})
+}
+
+func (t *TransportService) writePacket(oper string, data []byte) {
+	t.sess.writePacket(oper, t.localId, t.remoteId, data)
 }
