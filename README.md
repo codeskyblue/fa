@@ -4,6 +4,8 @@
 
 `fa` is a command line tool that wraps `adb` in order to extend it with extra features and commands that make working with Android easier.
 
+This project is still in developing, please be careful when use in production.
+
 ## Features
 - [x] show device selection when multi device connected
 - [x] screenshot
@@ -132,18 +134,27 @@ $ adb shell /data/local/tmp/busybox ls
 Share local device
 
 ```bash
+# share in localnet
 $ fa share
-# here will print a address, eg: tcp://max.labstack.me:8000
+Connect with: adb connect 10.0.0.1:6174
+
+# share to public ip
+$ fa share --tunnel
+______                   __
+/_  __/_ _____  ___  ___ / /
+ / / / // / _ \/ _ \/ -_) /
+/_/  \_,_/_//_/_//_/\__/_/ v0.2.11
+
+Expose local servers to internet securely
+https://labstack.com/docs/tunnel
+________________________________O/_______
+                                O\
+⇨ routing traffic from tcp://leo.labstack.me:10081
 ```
 
-In another machine use `adb connect`, for example the share addr is `max.labstack.me:8000`
+When use tunnel, you should use `adb connect leo.labstack.me:10081`
 
-```bash
-$ adb connect max.labstack.me:8000
-device connected
-$ adb -s max.labstack.me:8000 shell pwd
-/
-```
+Then you can use adb to do anything just like device plugged in your computer.
 
 ### Pidcat (logcat)
 Current implementation is wrapper of [pidcat.py](https://github.com/JakeWharton/pidcat)

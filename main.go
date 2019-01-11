@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -451,7 +452,18 @@ func main() {
 		},
 		{
 			Name:  "share",
-			Usage: "share device as address for adb connect",
+			Usage: "provides an USB device over TCP using a translating proxy",
+			Flags: []cli.Flag{
+				cli.BoolFlag{
+					Name:  "tunnel",
+					Usage: "share device to public net, using labstack.me tunnel service",
+				},
+				cli.IntFlag{
+					Name:  "port",
+					Usage: "listen port",
+					Value: 6174,
+				},
+			},
 			Action: func(ctx *cli.Context) error {
 				serial, err := chooseOne()
 				if err != nil {
@@ -460,10 +472,17 @@ func main() {
 				client := adb.NewClient(fmt.Sprintf("%s:%d", defaultHost, defaultPort))
 				device := client.DeviceWithSerial(serial)
 
+				if !ctx.Bool("tunnel") {
+					adbd := adb.NewADBDaemon(device)
+					fmt.Printf("Connect with: adb connect %s:%d\n", GetLocalIP(), ctx.Int("port"))
+					return adbd.ListenAndServe(":" + strconv.Itoa(ctx.Int("port")))
+				}
+
+				rand.Seed(time.Now().Unix())
 				c := &tunnel.Configuration{
 					Host:       "labstack.me:22",
 					RemoteHost: "0.0.0.0",
-					RemotePort: 10000 + rand.Intn(1000),
+					RemotePort: 10000 + rand.Intn(2000),
 					Channel:    make(chan int),
 					InBoundConnectionHook: func(in net.Conn) error {
 						log.Println("Accept new connection", in.RemoteAddr().String())
