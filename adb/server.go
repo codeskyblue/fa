@@ -22,7 +22,7 @@ func NewADBDaemon(device *Device) *ADBDaemon {
 }
 
 func (s *ADBDaemon) ListenAndServe(addr string) error {
-	ln, err := net.Listen("tcp", ":9000")
+	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return err
 	}
@@ -37,7 +37,7 @@ func (s *ADBDaemon) Serve(ln net.Listener) error {
 			return err
 		}
 		remoteAddress := conn.RemoteAddr().String()
-		log.Infof("Serve client: %v", remoteAddress)
+		log.Infof("Incomming request from: %v", remoteAddress)
 
 		s.mu.Lock()
 		s.remotes[remoteAddress] = conn
