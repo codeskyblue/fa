@@ -168,18 +168,19 @@ func (sess *Session) onOpen(pkt Packet) {
 	log.Infof("Calling #%s, remoteId: %d, localId: %d", name, remoteId, localId)
 
 	if strings.HasPrefix(name, "reverse:") {
-		failMessage := "reverse service not supported"
-		sess.writePacket(_OKAY, localId, remoteId, nil)
-		sess.writePacket(_WRTE, localId, remoteId, []byte("FAIL"+fmt.Sprintf(
-			"%04x%s", len(failMessage), failMessage,
-		)))
-		sess.writePacket(_CLSE, localId, remoteId, nil)
-		return
+		name = "xxxx" + name[4:]
+		// failMessage := "reverse service not supported"
+		// sess.writePacket(_OKAY, localId, remoteId, nil)
+		// sess.writePacket(_WRTE, localId, remoteId, []byte("FAIL"+fmt.Sprintf(
+		// 	"%04x%s", len(failMessage), failMessage,
+		// )))
+		// sess.writePacket(_CLSE, localId, remoteId, nil)
+		// return
 	}
 
 	// Session service
-	device := NewClient("").Device(AnyUsbDevice())
-	conn, err := device.OpenTransport()
+	// device := NewClient("").Device(AnyUsbDevice())
+	conn, err := sess.device.OpenTransport()
 	if err != nil {
 		sess.err = err
 		return
