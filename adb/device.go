@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
+	"regexp"
+	"strings"
 	"time"
 
 	shellquote "github.com/kballard/go-shellquote"
@@ -146,6 +148,21 @@ func (p PropValue) Bool() bool {
 	return p == "true"
 }
 
+var propertyRE = regexp.MustCompile(`\[(.+)\]: \[(.+)\]`)
+
 func (ad *Device) Properties() (props map[string]PropValue, err error) {
+	props = make(map[string]PropValue)
+	output, err := ad.RunCommand("getprop")
+	if err != nil {
+		return
+	}
+	for _, line := range strings.Split(output, "\n") {
+		parts := propertyRE.FindStringSubmatch(line)
+		if len(parts) != 3 {
+			continue
+		}
+		key, val := parts[1], parts[2]
+		props[key] = PropValue(val)
+	}
 	return
 }

@@ -4,7 +4,6 @@ require (
 	github.com/cavaliercoder/grab v2.0.0+incompatible
 	github.com/fatih/color v1.7.0 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
-	github.com/kr/pty v1.1.3 // indirect
 	github.com/labstack/tunnel-client v0.2.12
 	github.com/manifoldco/promptui v0.3.2
 	github.com/mattn/go-runewidth v0.0.3 // indirect

@@ -81,8 +81,13 @@ func (s *Session) Serve() {
 			s.onAuth(pkt)
 		case _OPEN:
 			s.onOpen(pkt)
-		case _OKAY, _WRTE, _CLSE:
+		case _OKAY, _WRTE:
 			s.forwardServicePacket(pkt)
+		case _CLSE:
+			s.forwardServicePacket(pkt)
+			s.mu.Lock()
+			delete(s.services, pkt.Arg1)
+			s.mu.Unlock()
 		default:
 			s.err = errors.New("unknown cmd: " + pkt.Command)
 		}
@@ -105,18 +110,22 @@ func (sess *Session) onConnection(pkt Packet) {
 	sess.maxPayload = maxPayload
 	// log.Println("MaxPayload:", maxPayload)
 	sess.err = sess.writePacket(_AUTH, AUTH_TOKEN, 0, sess.token)
-	pkt.DumpToStdout()
+	// pkt.DumpToStdout()
 }
 
 func (sess *Session) authVerified() {
 	version := swapUint32(1)
 	// FIXME(ssx): need device.Properties()
-	connProps := []string{
-		"ro.product.name=2014011",
-		"ro.product.model=2014011",
-		"ro.product.device=HM2014011",
+	props, _ := sess.device.Properties()
+	connProps := make([]string, 0, 3)
+	for _, propName := range []string{
+		"ro.product.name",
+		"ro.product.model",
+		"ro.product.device",
+	} {
+		connProps = append(connProps, fmt.Sprintf("%s=%s", propName, props[propName]))
 	}
-	// connProps = append(connProps, "features=cmd,stat_v2,shell_v2")
+	// connProps = append(connProps, "features=cmd") //,stat_v2,shell_v2")
 	deviceBanner := "device"
 	payload := fmt.Sprintf("%s::%s", deviceBanner, strings.Join(connProps, ";"))
 	// id := "device::;;\x00"
@@ -167,35 +176,10 @@ func (sess *Session) onOpen(pkt Packet) {
 	name := string(pkt.BodySkipNull())
 	log.Infof("Calling #%s, remoteId: %d, localId: %d", name, remoteId, localId)
 
-	if strings.HasPrefix(name, "reverse:") {
-		name = "xxxx" + name[4:]
-		// failMessage := "reverse service not supported"
-		// sess.writePacket(_OKAY, localId, remoteId, nil)
-		// sess.writePacket(_WRTE, localId, remoteId, []byte("FAIL"+fmt.Sprintf(
-		// 	"%04x%s", len(failMessage), failMessage,
-		// )))
-		// sess.writePacket(_CLSE, localId, remoteId, nil)
-		// return
-	}
-
-	// Session service
-	// device := NewClient("").Device(AnyUsbDevice())
-	conn, err := sess.device.OpenTransport()
-	if err != nil {
-		sess.err = err
-		return
-	}
-	conn.Encode(pkt.BodySkipNull())
-	if err := conn.CheckOKAY(); err != nil {
-		sess.err = errors.Wrap(err, "session.OPEN")
-		return
-	}
-
 	service := &TransportService{
-		localId:   localId,
-		remoteId:  remoteId,
-		sess:      sess,
-		transport: conn,
+		localId:  localId,
+		remoteId: remoteId,
+		sess:     sess,
 	}
 
 	sess.mu.Lock()
@@ -203,7 +187,7 @@ func (sess *Session) onOpen(pkt Packet) {
 	sess.mu.Unlock()
 
 	service.handle(pkt)
-	pkt.DumpToStdout()
+	// pkt.DumpToStdout()
 }
 
 func (sess *Session) forwardServicePacket(pkt Packet) {
@@ -211,7 +195,7 @@ func (sess *Session) forwardServicePacket(pkt Packet) {
 	service, ok := sess.services[pkt.Arg1] // localId
 	sess.mu.Unlock()
 	if !ok {
-		sess.err = errors.New("transport service already closed")
+		log.Warnf("Receive packet of already closed service: localId: %d", pkt.Arg1)
 		return
 	}
 	service.handle(pkt)
@@ -240,8 +224,36 @@ func (t *TransportService) handle(pkt Packet) {
 	}
 }
 
+func (t *TransportService) writeError(message string) {
+	t.writePacket(_WRTE, []byte("FAIL"+fmt.Sprintf(
+		"%04x%s", len(message), message,
+	)))
+}
+
 func (t *TransportService) handleOpenPacket(pkt Packet) {
 	t.writePacket(_OKAY, nil)
+
+	serviceName := string(pkt.BodySkipNull())
+	if strings.HasPrefix(serviceName, "reverse:") {
+		failMessage := "reverse service not supported"
+		t.writeError(failMessage)
+		t.end()
+		return
+	}
+
+	var err error
+	t.transport, err = t.sess.device.OpenTransport()
+	if err != nil {
+		t.end()
+		return
+	}
+	t.transport.Encode([]byte(serviceName))
+
+	if err := t.transport.CheckOKAY(); err != nil {
+		t.writeError(err.Error())
+		t.end()
+		return
+	}
 
 	go func() {
 		buf := make([]byte, t.sess.maxPayload)
@@ -259,8 +271,8 @@ func (t *TransportService) handleOpenPacket(pkt Packet) {
 }
 
 func (t *TransportService) handleWritePacket(pkt Packet) {
-	t.transport.Write(pkt.Body)
 	t.writePacket(_OKAY, nil)
+	t.transport.Write(pkt.Body)
 }
 
 func (t *TransportService) handleClosePacket(pkt Packet) {
@@ -270,7 +282,9 @@ func (t *TransportService) handleClosePacket(pkt Packet) {
 func (t *TransportService) end() {
 	t.once.Do(func() {
 		t.ended = true
-		t.transport.Close()
+		if t.transport != nil {
+			t.transport.Close()
+		}
 		t.writePacket(_CLSE, nil)
 	})
 }
