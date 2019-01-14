@@ -505,14 +505,37 @@ func main() {
 		{
 			Name:  "watch",
 			Usage: "show newest state when device state change",
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:  "online-hook-cmd",
+					Usage: "run when device came online",
+				},
+			},
 			Action: func(ctx *cli.Context) error {
 				client := NewAdbClient()
 				eventC, err := client.Watch()
 				if err != nil {
 					return err
 				}
+				onlineHook := ctx.String("online-hook-cmd")
 				for ev := range eventC {
-					println(ev)
+					fmt.Println(ev)
+					if ev.CameOnline() {
+						// log.Println("Online", ev)
+						var cmd *exec.Cmd
+						if runtime.GOOS == "windows" {
+							cmd = exec.Command("cmd", "/c", onlineHook)
+						} else {
+							cmd = exec.Command("bash", "-c", onlineHook)
+						}
+						cmd.Env = append(os.Environ(), "SERIAL="+ev.Serial)
+						cmd.Stdout = os.Stdout
+						cmd.Stderr = os.Stderr
+						cmd.Run()
+					}
+					// if ev.WentOffline {
+
+					// }
 				}
 				return nil
 			},

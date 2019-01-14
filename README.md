@@ -130,6 +130,27 @@ $ fa shell busybox ls
 $ adb shell /data/local/tmp/busybox ls
 ```
 
+### Watch
+Trace device `came online` and `went offline`
+
+```bash
+$ fa watch
+3578298f offline
+3578298f device
+```
+
+Hook script when device online
+
+```bash
+# on windows
+$ fa watch --online-hook-cmd="echo %SERIAL%" 
+
+# on linux
+$ fa watch --online-hook-cmd="echo \$SERIAL" 
+```
+
+This subcommand seems not very stable, raise issue when you find something wrong.
+
 ### Share
 Share local device
 

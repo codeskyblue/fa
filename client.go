@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+	"log"
 	"net"
 	"os/exec"
 	"strconv"
@@ -39,9 +41,55 @@ func (c *AdbClient) Version() (string, error) {
 	return c.rawVersion()
 }
 
-func (c *AdbClient) Watch() (C chan string, err error) {
-	C = make(chan string, 0)
-	// c.Version()
+// Plugged in: StateDisconnected->StateOffline->StateOnline
+// Unplugged:  StateOnline->StateDisconnected
+type DeviceState string
+
+const (
+	StateInvalid      = ""
+	StateDisconnected = "disconnected"
+	StateOffline      = "offline"
+	StateOnline       = "device"
+	StateUnauthorized = "unauthorized"
+)
+
+func newDeviceState(s string) DeviceState {
+	switch s {
+	case "device":
+		return StateOnline
+	case "offline":
+		return StateOffline
+	case "disconnected":
+		return StateDisconnected
+	case "unauthorized":
+		return StateUnauthorized
+	default:
+		return StateInvalid
+	}
+}
+
+type DeviceStateChangedEvent struct {
+	Serial   string
+	OldState DeviceState
+	NewState DeviceState
+}
+
+func (s DeviceStateChangedEvent) String() string {
+	return fmt.Sprintf("%s: %s->%s", s.Serial, s.OldState, s.NewState)
+}
+
+// CameOnline returns true if this event represents a device coming online.
+func (s DeviceStateChangedEvent) CameOnline() bool {
+	return s.OldState != StateOnline && s.NewState == StateOnline
+}
+
+// WentOffline returns true if this event represents a device going offline.
+func (s DeviceStateChangedEvent) WentOffline() bool {
+	return s.OldState == StateOnline && s.NewState != StateOnline
+}
+
+func (c *AdbClient) Watch() (C chan DeviceStateChangedEvent, err error) {
+	C = make(chan DeviceStateChangedEvent, 0)
 	conn, err := c.newConnection()
 	if err != nil {
 		return
@@ -49,15 +97,29 @@ func (c *AdbClient) Watch() (C chan string, err error) {
 	conn.WritePacket("host:track-devices")
 	go func() {
 		defer close(C)
+		var lastKnownStates = make(map[string]DeviceState)
 		for {
 			line, err := conn.readString()
 			if err != nil {
 				break
 			}
 			line = strings.TrimSpace(line)
-			if line != "" {
-				C <- line
+			log.Println("TRACK", strconv.Quote(line))
+			if line == "" {
+				continue
 			}
+			parts := strings.Split(line, "\t")
+			if len(parts) != 2 {
+				continue
+			}
+			serial, state := parts[0], newDeviceState(parts[1])
+
+			C <- DeviceStateChangedEvent{
+				Serial:   serial,
+				OldState: lastKnownStates[serial],
+				NewState: state,
+			}
+			lastKnownStates[serial] = state
 		}
 	}()
 	return
